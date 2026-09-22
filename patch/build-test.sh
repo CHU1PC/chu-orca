@@ -2,8 +2,8 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 BRANCH=$(git -C "$ROOT" branch --show-current)
-if [ "$BRANCH" != 'patched-test' ]; then
-  printf '%s\n' "build-test.sh must run on the patched-test branch (current: $BRANCH)" >&2
+if [ "$BRANCH" != 'patched' ]; then
+  printf '%s\n' "build-test.sh must run on the patched branch (current: $BRANCH)" >&2
   exit 1
 fi
 STATUS=$(git -C "$ROOT" status --porcelain)
