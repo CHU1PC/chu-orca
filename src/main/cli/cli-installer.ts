@@ -13,6 +13,7 @@ import {
 } from './appimage-extracted-root'
 import { isAppImageStableLauncherReady } from './appimage-stable-launcher'
 import { CliPathRegistration } from './cli-path-registration'
+import { isPatchedTestFlavor } from '../orca-patched/flavor'
 
 export class CliInstaller extends CliPathRegistration {
   isAppImageRegistrationOwnedBySibling(status: CliInstallStatus): boolean {
@@ -102,6 +103,7 @@ export class CliInstaller extends CliPathRegistration {
   }
 
   async install(): Promise<CliInstallStatus> {
+    if (isPatchedTestFlavor()) return this.getStatus()
     return this.runAppImageRegistrationOperation(() => this.installUnlocked())
   }
 
@@ -159,6 +161,7 @@ export class CliInstaller extends CliPathRegistration {
   }
 
   async remove(): Promise<CliInstallStatus> {
+    if (isPatchedTestFlavor()) return this.getStatus()
     return this.runAppImageRegistrationOperation(() => this.removeUnlocked())
   }
 

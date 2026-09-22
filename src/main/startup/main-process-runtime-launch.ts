@@ -33,6 +33,7 @@ import {
   showRuntimeRpcStartupFailureDialog
 } from '../runtime/runtime-rpc-startup-failure'
 import { CliInstaller } from '../cli/cli-installer'
+import { isPatchedTestFlavor } from '../orca-patched/flavor'
 import { installLinuxBareOrcaDispatcher } from '../cli/linux-bare-orca-dispatcher'
 import { scheduleAllPendingHistoryTreeRemovals } from '../terminal-history-deletion'
 import { triggerStartupNotificationRegistration } from '../ipc/startup-notification-registration'
@@ -83,6 +84,7 @@ function installRuntimeRpc(
     // `orca serve` is an explicit remote opt-in, and E2E keeps the wide bind its harness connects over.
     exposeNetworkByDefault: Boolean(serveOptions) || isE2E,
     ...(isE2E ? { wsPort: e2eWsPort } : {}),
+    ...(isPatchedTestFlavor() ? { wsPort: 0 } : {}),
     ...(devWsPort !== undefined ? { wsPort: devWsPort } : {}),
     ...(serveOptions?.wsPort !== undefined
       ? {

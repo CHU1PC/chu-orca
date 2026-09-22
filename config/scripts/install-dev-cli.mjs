@@ -8,6 +8,11 @@ import path from 'node:path'
 const scriptDir = import.meta.dirname
 const source = path.join(scriptDir, 'orca-dev.mjs')
 
+if (process.env.ORCA_PATCHED_FLAVOR === 'test') {
+  console.log('[orca-patch-dev] Skipping global symlink for Orca-Patch test flavor.')
+  process.exit(0)
+}
+
 const commandPath =
   process.platform === 'darwin' || process.platform === 'linux' ? '/usr/local/bin/orca-dev' : null
 
