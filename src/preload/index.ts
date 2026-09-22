@@ -83,6 +83,7 @@ import { e2eApi } from './api/e2e-bridge'
 import { mobileApi } from './api/mobile-bridge'
 import { agentStatusApi } from './api/agent-status-bridge'
 import { speechApi } from './api/speech-bridge'
+import { lspApi } from './api/lsp-api'
 
 installNativeFileDropHandlers()
 installBrowserFindListener()
@@ -161,6 +162,7 @@ const api = {
   docPreview: docPreviewApi,
   notebook: notebookApi,
   fs: fsApi,
+  lsp: lspApi,
   git: gitApi,
   ui: uiApi,
   stats: statsApi,

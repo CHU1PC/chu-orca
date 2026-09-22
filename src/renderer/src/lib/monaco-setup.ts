@@ -18,6 +18,8 @@ import { installMonacoDelayerCancellationGuard } from './monaco-delayer-cancella
 import { installMonacoDiffEditorDisposalGuard } from './monaco-diff-editor-disposal'
 import { installMonacoPeekReferencesPreviewOptions } from './monaco-peek-preview-options'
 import { installMonacoContextMenuPaste } from '@/components/editor/install-monaco-context-menu-paste'
+import { configureMonacoLsp } from './monaco-lsp/monaco-lsp-setup'
+import { configureMonacoTextMate } from './monaco-textmate/monaco-textmate-setup'
 
 globalThis.MonacoEnvironment = {
   getWorker(_workerId, label) {
@@ -60,6 +62,8 @@ const diagnosticsOptions = {
 }
 monacoTS.typescriptDefaults.setDiagnosticsOptions(diagnosticsOptions)
 monacoTS.javascriptDefaults.setDiagnosticsOptions(diagnosticsOptions)
+configureMonacoLsp()
+configureMonacoTextMate()
 
 // Why: .tsx/.jsx files share the base 'typescript'/'javascript' language ids
 // in Monaco's registry (there is no separate 'typescriptreact' id), so the
