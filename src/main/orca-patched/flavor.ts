@@ -5,6 +5,7 @@ import type { DevInstanceIdentity } from '../startup/dev-instance-identity'
 declare const ORCA_PATCHED_FLAVOR: 'test' | 'release'
 
 export function isPatchedTestFlavor(): boolean {
+  // oxlint-disable-next-line unicorn/no-typeof-undefined -- Why: vitest has no vite `define`, so a bare identifier reference throws ReferenceError.
   return typeof ORCA_PATCHED_FLAVOR !== 'undefined' && ORCA_PATCHED_FLAVOR === 'test'
 }
 

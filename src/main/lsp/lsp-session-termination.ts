@@ -1,4 +1,4 @@
-import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import type { ChildProcessWithoutNullStreams } from '../../shared/child-process/run-process'
 import { encodeLspMessage } from './lsp-message-framing'
 
 export const LSP_SHUTDOWN_GRACE_MS = 250

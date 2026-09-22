@@ -1,7 +1,8 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
-import { spawn } from 'node:child_process'
-import type { ChildProcessWithoutNullStreams } from 'node:child_process'
-import { getSpawnArgsForWindows } from '../../shared/windows-batch-spawn'
+import {
+  spawnProcess,
+  type ChildProcessWithoutNullStreams
+} from '../../shared/child-process/run-process'
 import { resolveWindowsCommand } from '../win32-utils'
 import type { LspServerDescriptor } from './lsp-server-catalog'
 
@@ -11,14 +12,12 @@ export type SpawnLspServer = (
 ) => ChildProcessWithoutNullStreams
 
 export const spawnLspServer: SpawnLspServer = (descriptor, rootPath) => {
-  // Why: npm-installed servers are .cmd shims on Windows; resolve the PATH entry
-  // and route batch scripts through cmd.exe explicitly (spawn+shell hits DEP0190).
   const command = resolveWindowsCommand(descriptor.resolvedCommand ?? descriptor.command)
-  const { spawnCmd, spawnArgs } = getSpawnArgsForWindows(command, [...descriptor.args])
-  const child = spawn(spawnCmd, spawnArgs, {
+  const child = spawnProcess({
+    program: command,
+    args: descriptor.args,
     cwd: rootPath,
     stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: true,
     // Why: hydrateShellPath already merged the login-shell PATH into process.env.
     env: process.env
   })

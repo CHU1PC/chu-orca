@@ -18,8 +18,15 @@ export type MonacoTokenColorRule = {
 }
 
 function expandScopes(scope: VsCodeTokenColor['scope']): string[] {
-  if (Array.isArray(scope)) return scope.map((entry) => entry.trim()).filter(Boolean)
-  if (typeof scope === 'string') return scope.split(',').map((entry) => entry.trim()).filter(Boolean)
+  if (Array.isArray(scope)) {
+    return scope.map((entry) => entry.trim()).filter(Boolean)
+  }
+  if (typeof scope === 'string') {
+    return scope
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  }
   return []
 }
 
@@ -31,7 +38,9 @@ function countDroppedDescendantScopes(tokenColors: readonly VsCodeTokenColor[]):
   )
 }
 
-export const DROPPED_DESCENDANT_SCOPE_COUNT = countDroppedDescendantScopes(oneDarkProTheme.tokenColors)
+export const DROPPED_DESCENDANT_SCOPE_COUNT = countDroppedDescendantScopes(
+  oneDarkProTheme.tokenColors
+)
 
 export function convertVsCodeTokenColors(
   tokenColors: readonly VsCodeTokenColor[]
@@ -39,12 +48,20 @@ export function convertVsCodeTokenColors(
   const rules: MonacoTokenColorRule[] = []
   for (const tokenColor of tokenColors) {
     const settings = tokenColor.settings
-    if (!settings || (!settings.foreground && !settings.fontStyle)) continue
+    if (!settings || (!settings.foreground && !settings.fontStyle)) {
+      continue
+    }
     for (const scope of expandScopes(tokenColor.scope)) {
-      if (scope.includes(' ')) continue
+      if (scope.includes(' ')) {
+        continue
+      }
       const rule: MonacoTokenColorRule = { token: scope }
-      if (settings.foreground) rule.foreground = settings.foreground.replace(/^#/, '')
-      if (settings.fontStyle !== undefined) rule.fontStyle = settings.fontStyle
+      if (settings.foreground) {
+        rule.foreground = settings.foreground.replace(/^#/, '')
+      }
+      if (settings.fontStyle !== undefined) {
+        rule.fontStyle = settings.fontStyle
+      }
       rules.push(rule)
     }
   }

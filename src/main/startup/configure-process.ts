@@ -236,7 +236,9 @@ export function configureOrcaUserDataPathEnv(): void {
 }
 
 export function shouldInstallManagedHooks(isDev: boolean): boolean {
-  if (isPatchedTestFlavor()) return false
+  if (isPatchedTestFlavor()) {
+    return false
+  }
   void isDev
   // Why: managed hooks now target Orca-owned Codex homes, not ~/.codex, so keep install on for all agents until each gets its own seam.
   return true

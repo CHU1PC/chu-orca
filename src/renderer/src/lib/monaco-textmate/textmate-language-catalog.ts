@@ -37,10 +37,30 @@ function hasDefaultExport(value: unknown): value is { default: unknown } {
   return typeof value === 'object' && value !== null && 'default' in value
 }
 
+function isRawGrammar(value: unknown): value is IRawGrammar {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'scopeName' in value &&
+    typeof value.scopeName === 'string' &&
+    'repository' in value &&
+    typeof value.repository === 'object' &&
+    value.repository !== null &&
+    'patterns' in value &&
+    Array.isArray(value.patterns)
+  )
+}
+
 export async function loadTextMateGrammar(scopeName: string): Promise<IRawGrammar | null> {
   const loader = textMateGrammarLoaders[scopeName]
-  if (!loader) return null
+  if (!loader) {
+    return null
+  }
 
   const grammarModule = await loader()
-  return (hasDefaultExport(grammarModule) ? grammarModule.default : grammarModule) as IRawGrammar
+  const grammar = hasDefaultExport(grammarModule) ? grammarModule.default : grammarModule
+  if (!isRawGrammar(grammar)) {
+    throw new Error(`Invalid TextMate grammar for scope ${scopeName}`)
+  }
+  return grammar
 }

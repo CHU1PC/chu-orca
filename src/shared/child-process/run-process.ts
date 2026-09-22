@@ -10,6 +10,8 @@ import { forceTerminateProcessTree, signalProcessTree } from './process-tree-ter
 import { createOutputSink } from './bounded-output-sink'
 import { createChildTerminationReporter } from './child-termination-reporter'
 
+export type { ChildProcessWithoutNullStreams } from 'node:child_process'
+
 export type {
   ChildProcessHandle,
   SpawnedProcess,

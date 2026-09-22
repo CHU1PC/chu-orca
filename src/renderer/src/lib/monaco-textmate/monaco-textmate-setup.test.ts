@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { TextMateDiagnostics } from './monaco-textmate-setup'
+import type * as MonacoTextMateSetup from './monaco-textmate-setup'
+
+declare global {
+  var __orcaTextMate: TextMateDiagnostics
+}
 
 type FakeModel = { getLanguageId: () => string }
 type ModelLanguageChangedCallback = (event: { model: FakeModel; oldLanguage: string }) => void
@@ -25,7 +31,7 @@ const {
   const initialCoreLanguages = makeLanguageApi()
   const currentCoreLanguages = { value: initialCoreLanguages }
   const existingModels: FakeModel[] = []
-  const createModelCallbacks: Array<(model: FakeModel) => void> = []
+  const createModelCallbacks: ((model: FakeModel) => void)[] = []
   const changeLanguageCallbacks: ModelLanguageChangedCallback[] = []
   const rejectPythonGrammar = { value: false }
   const loadGrammarMock = vi.fn(async (scopeName: string) => {
@@ -104,7 +110,7 @@ async function flushPromises(): Promise<void> {
   await Promise.resolve()
 }
 
-async function importSetup(): Promise<typeof import('./monaco-textmate-setup')> {
+async function importSetup(): Promise<typeof MonacoTextMateSetup> {
   vi.resetModules()
   return import('./monaco-textmate-setup')
 }
@@ -112,25 +118,13 @@ async function importSetup(): Promise<typeof import('./monaco-textmate-setup')> 
 function diagnostics(): {
   registered: string[]
   active: string[]
-  failures: Array<{ languageId: string; message: string }>
+  failures: { languageId: string; message: string }[]
   reasserts: Record<string, number>
   wrappedTargets: number
   sameLanguagesObject: boolean
   scheduledReasserts: Record<string, number>
 } {
-  return (
-    globalThis as typeof globalThis & {
-      __orcaTextMate: {
-        registered: string[]
-        active: string[]
-        failures: Array<{ languageId: string; message: string }>
-        reasserts: Record<string, number>
-        wrappedTargets: number
-        sameLanguagesObject: boolean
-        scheduledReasserts: Record<string, number>
-      }
-    }
-  ).__orcaTextMate
+  return globalThis.__orcaTextMate
 }
 
 beforeEach(() => {

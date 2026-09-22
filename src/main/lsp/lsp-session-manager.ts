@@ -1,6 +1,10 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
 import { pathToFileURL } from 'node:url'
-import type { LspOpenDocumentResult, LspRequestMethod, LspSessionInfo } from '../../shared/lsp-types'
+import type {
+  LspOpenDocumentResult,
+  LspRequestMethod,
+  LspSessionInfo
+} from '../../shared/lsp-types'
 import { canonicalFileUriKey } from './lsp-file-uri-key'
 import { buildLspInitializeParams } from './lsp-initialize-params'
 import { encodeLspMessage, LspMessageDecoder } from './lsp-message-framing'
@@ -142,9 +146,18 @@ export function createLspSessionManager(deps?: {
       'initialize',
       buildLspInitializeParams(rootPath)
     ).then((result) => {
-      const capabilities = (result as { capabilities?: { diagnosticProvider?: unknown } } | null)
-        ?.capabilities
-      session.pullDiagnostics = Boolean(capabilities?.diagnosticProvider)
+      const capabilities =
+        result !== null && typeof result === 'object' && 'capabilities' in result
+          ? result.capabilities
+          : undefined
+      const diagnosticProvider =
+        capabilities !== null &&
+        typeof capabilities === 'object' &&
+        capabilities !== undefined &&
+        'diagnosticProvider' in capabilities
+          ? capabilities.diagnosticProvider
+          : undefined
+      session.pullDiagnostics = Boolean(diagnosticProvider)
       send(session, { jsonrpc: '2.0', method: 'initialized', params: {} })
     })
     session.initialization.catch(() => {})
@@ -173,9 +186,7 @@ export function createLspSessionManager(deps?: {
       { trustedRootsFilePath: deps?.trustedRootsFilePath }
     )
     if (descriptors.length === 0) {
-      return projectToolsSkippedReason
-        ? { ...noSession, projectToolsSkippedReason }
-        : noSession
+      return projectToolsSkippedReason ? { ...noSession, projectToolsSkippedReason } : noSession
     }
     const fileUri = pathToFileURL(args.filePath).toString()
     const sessions: LspSessionInfo[] = []

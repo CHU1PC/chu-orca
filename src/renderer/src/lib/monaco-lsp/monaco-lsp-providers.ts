@@ -215,14 +215,25 @@ export function ensureLspSupportForLanguage(monaco: MonacoApi, languageId: strin
           endLineNumber: position.lineNumber,
           endColumn: position.column
         }
+        const completionKinds: Record<string, number> = {}
+        for (const [name, value] of Object.entries(monaco.languages.CompletionItemKind)) {
+          if (typeof value === 'number') {
+            completionKinds[name] = value
+          }
+        }
         const converted = lspCompletionToMonaco(response.result, defaultRange, {
-          kinds: monaco.languages.CompletionItemKind as unknown as Record<string, number>,
+          kinds: completionKinds,
           snippetRule: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
         })
+        const suggestions = converted.suggestions.map((suggestion) => ({
+          ...suggestion,
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: lspCompletionToMonaco resolves kinds from Monaco's own enum values.
+          kind: suggestion.kind as languages.CompletionItemKind
+        }))
         return {
           // Why: the converter emits numeric enum values so it stays node-testable;
           // the shapes are structurally identical to Monaco's CompletionItem.
-          suggestions: converted.suggestions as unknown as languages.CompletionItem[],
+          suggestions,
           incomplete: converted.incomplete
         }
       }
@@ -241,6 +252,10 @@ export function ensureInlineDiagnosticsForModel(
   return inlineDiagnosticsWiring.trackModel(editorInstance, model)
 }
 
-export function clearLspMarkers(monaco: MonacoApi, model: editor.ITextModel, serverId: string): void {
+export function clearLspMarkers(
+  monaco: MonacoApi,
+  model: editor.ITextModel,
+  serverId: string
+): void {
   monaco.editor.setModelMarkers(model, lspMarkerOwner(serverId), [])
 }

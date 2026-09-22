@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import type { editor } from 'monaco-editor'
 import { useAppStore } from '@/store'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
-import { getConnectionId } from '@/lib/connection-context'
+import { getConnectionIdFromState } from '@/lib/connection-context'
 import { attachMonacoLspDocument } from '@/lib/monaco-lsp/monaco-lsp-attach'
 import { resolveAnnotationPathInsideWorktree } from './check-annotation-path'
 
@@ -22,12 +22,13 @@ export function useMonacoLspForDiff(params: {
   const worktreePath = useAppStore((s) =>
     worktreeId ? (findWorktreeById(s.worktreesByRepo, worktreeId)?.path ?? null) : null
   )
+  const connectionId = useAppStore((s) => getConnectionIdFromState(s, worktreeId ?? null))
 
   useEffect(() => {
     if (!modifiedEditor || !worktreeId || !worktreePath) {
       return
     }
-    if (getConnectionId(worktreeId) !== null) {
+    if (connectionId !== null) {
       return
     }
     const resolved = resolveAnnotationPathInsideWorktree(worktreePath, relativePath)
@@ -47,5 +48,13 @@ export function useMonacoLspForDiff(params: {
       languageId: language
     })
     // Why: modelIdentity re-attaches after the diff surface swaps its models.
-  }, [modifiedEditor, worktreeId, worktreePath, relativePath, language, modelIdentity])
+  }, [
+    modifiedEditor,
+    worktreeId,
+    worktreePath,
+    relativePath,
+    language,
+    modelIdentity,
+    connectionId
+  ])
 }

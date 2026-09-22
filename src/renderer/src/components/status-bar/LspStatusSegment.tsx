@@ -24,7 +24,7 @@ export function LspStatusSegment({ iconOnly }: { iconOnly: boolean }): React.JSX
           <span
             className={cn(
               'size-1.5 rounded-full',
-              starting ? 'animate-pulse bg-amber-500' : 'bg-emerald-500'
+              starting ? 'animate-pulse bg-workspace-status-progress' : 'bg-status-success'
             )}
           />
           {iconOnly

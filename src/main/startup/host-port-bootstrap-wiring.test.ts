@@ -83,6 +83,7 @@ describe('host port bootstrap wiring', () => {
 
     expect(statements).toEqual([
       'configureDevUserDataPath(isDev)',
+      'configurePatchedTestUserDataPath()',
       'configureOrcaUserDataPathEnv()',
       'setAppEnvironment(new ElectronAppEnvironment())'
     ])

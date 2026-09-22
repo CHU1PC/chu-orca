@@ -10,7 +10,9 @@ export function resolveTokenScope(scopes: readonly string[], index: ThemeScopeIn
     const segments = scope.split('.')
     for (let prefixLength = segments.length; prefixLength > 0; prefixLength -= 1) {
       const prefix = segments.slice(0, prefixLength).join('.')
-      if (index.has(prefix)) return scope
+      if (index.has(prefix)) {
+        return scope
+      }
     }
   }
   return scopes.at(-1) ?? ''

@@ -5,12 +5,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 export type LocalCommandDirectory = 'python-venv' | 'node-modules' | 'path-only'
 export type LspResolutionOptions = { trustedRootsFilePath?: string }
 
-const DEFAULT_TRUSTED_ROOTS_FILE = join(
-  homedir(),
-  '.config',
-  'orca-patched',
-  'trusted-roots.json'
-)
+const DEFAULT_TRUSTED_ROOTS_FILE = join(homedir(), '.config', 'orca-patched', 'trusted-roots.json')
 
 export function isExecutableFile(path: string): boolean {
   try {
@@ -32,14 +27,15 @@ function isPathInsideOrEqual(path: string, rootPath: string): boolean {
 function loadTrustedRoots(filePath: string): string[] {
   try {
     const parsed: unknown = JSON.parse(readFileSync(filePath, 'utf8'))
+    const parsedRecord = parsed !== null && typeof parsed === 'object' ? parsed : null
     if (
-      !parsed ||
-      typeof parsed !== 'object' ||
-      !Array.isArray((parsed as { trustedRoots?: unknown }).trustedRoots)
+      !parsedRecord ||
+      !('trustedRoots' in parsedRecord) ||
+      !Array.isArray(parsedRecord.trustedRoots)
     ) {
       return []
     }
-    const entries = (parsed as { trustedRoots: unknown[] }).trustedRoots
+    const entries = parsedRecord.trustedRoots
     return entries.flatMap((entry) => {
       try {
         if (typeof entry !== 'string' || !isAbsolute(entry)) {
@@ -85,7 +81,10 @@ export function projectCommandCandidates(
     if (relativeToRoot.startsWith('..') || isAbsolute(relativeToRoot)) {
       return candidates
     }
-    const base = localCommandDirectory === 'python-venv' ? join(current, '.venv') : join(current, 'node_modules')
+    const base =
+      localCommandDirectory === 'python-venv'
+        ? join(current, '.venv')
+        : join(current, 'node_modules')
     candidates.push(
       localCommandDirectory === 'python-venv'
         ? join(base, 'bin', command)
@@ -113,7 +112,10 @@ export function isSafeProjectCommand(
     if (!isPathInsideOrEqual(parentRealPath, realRoot)) {
       return false
     }
-    if (localCommandDirectory === 'python-venv' && !isPathInsideOrEqual(dirname(parentRealPath), realRoot)) {
+    if (
+      localCommandDirectory === 'python-venv' &&
+      !isPathInsideOrEqual(dirname(parentRealPath), realRoot)
+    ) {
       return false
     }
     return isPathInsideOrEqual(realpathSync(commandPath), realRoot)
@@ -140,7 +142,9 @@ export function getProjectToolsSkippedReason(
   if (
     isTrustedWorkspaceRoot(rootPath, options) ||
     !commands.some((command) =>
-      projectCommandCandidates(filePath, rootPath, command, localCommandDirectory).some(isExecutableFile)
+      projectCommandCandidates(filePath, rootPath, command, localCommandDirectory).some(
+        isExecutableFile
+      )
     )
   ) {
     return undefined
