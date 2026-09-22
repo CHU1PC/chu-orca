@@ -1,0 +1,14 @@
+#!/bin/sh
+# pnpm の実体を探す。Homebrew などで入れた pnpm があればそれを、無ければ corepack 経由を使う
+SELF=$(cd -- "$(dirname -- "$0")" && pwd)
+for DIR in $(printf '%s' "$PATH" | tr ':' '\n'); do
+  [ "$DIR" = "$SELF" ] && continue
+  if [ -x "$DIR/pnpm" ]; then
+    exec "$DIR/pnpm" "$@"
+  fi
+done
+if command -v corepack >/dev/null 2>&1; then
+  exec corepack pnpm "$@"
+fi
+printf '%s\n' 'pnpm が見つかりません。brew install pnpm を実行してください' >&2
+exit 127
