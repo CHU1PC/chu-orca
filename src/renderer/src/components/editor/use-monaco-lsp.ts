@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import type { editor } from 'monaco-editor'
 import { useAppStore } from '@/store'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
-import { getConnectionId } from '@/lib/connection-context'
+import { getConnectionIdFromState } from '@/lib/connection-context'
 import { attachMonacoLspDocument } from '@/lib/monaco-lsp/monaco-lsp-attach'
 
 /** Attach the mounted editor's document to a local language server, when one
@@ -20,12 +20,13 @@ export function useMonacoLsp(params: {
   const worktreePath = useAppStore((s) =>
     worktreeId ? (findWorktreeById(s.worktreesByRepo, worktreeId)?.path ?? null) : null
   )
+  const connectionId = useAppStore((s) => getConnectionIdFromState(s, worktreeId ?? null))
 
   useEffect(() => {
     if (!mountedEditor || !worktreeId || !worktreePath || liveTail) {
       return
     }
-    if (getConnectionId(worktreeId) !== null) {
+    if (connectionId !== null) {
       return
     }
     const model = mountedEditor.getModel()
@@ -40,5 +41,5 @@ export function useMonacoLsp(params: {
       worktreeId,
       languageId: language
     })
-  }, [mountedEditor, filePath, language, worktreeId, worktreePath, liveTail])
+  }, [mountedEditor, filePath, language, worktreeId, worktreePath, liveTail, connectionId])
 }

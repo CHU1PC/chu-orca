@@ -103,7 +103,9 @@ export class CliInstaller extends CliPathRegistration {
   }
 
   async install(): Promise<CliInstallStatus> {
-    if (isPatchedTestFlavor()) return this.getStatus()
+    if (isPatchedTestFlavor()) {
+      return this.getStatus()
+    }
     return this.runAppImageRegistrationOperation(() => this.installUnlocked())
   }
 
@@ -161,7 +163,9 @@ export class CliInstaller extends CliPathRegistration {
   }
 
   async remove(): Promise<CliInstallStatus> {
-    if (isPatchedTestFlavor()) return this.getStatus()
+    if (isPatchedTestFlavor()) {
+      return this.getStatus()
+    }
     return this.runAppImageRegistrationOperation(() => this.removeUnlocked())
   }
 

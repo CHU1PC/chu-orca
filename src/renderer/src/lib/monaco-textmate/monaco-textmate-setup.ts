@@ -27,10 +27,21 @@ type WrappedLanguageTarget = {
   originalSetTokensProvider: ProviderSetter
   originalSetMonarchTokensProvider: ProviderSetter
 }
-type TextMateDiagnostics = {
+
+function isLanguageApi(value: unknown): value is LanguageApi {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'setTokensProvider' in value &&
+    typeof value.setTokensProvider === 'function' &&
+    'setMonarchTokensProvider' in value &&
+    typeof value.setMonarchTokensProvider === 'function'
+  )
+}
+export type TextMateDiagnostics = {
   registered: string[]
   active: string[]
-  failures: Array<{ languageId: string; message: string }>
+  failures: { languageId: string; message: string }[]
   reasserts: Record<string, number>
   wrappedTargets: number
   sameLanguagesObject: boolean
@@ -48,9 +59,9 @@ const textMateDiagnostics: TextMateDiagnostics = {
 }
 
 // 実行中のアプリを再ビルドせず、DevTools から調査できるように公開する。
-const globalWithTextMateDiagnostics = globalThis as typeof globalThis & {
+const globalWithTextMateDiagnostics: typeof globalThis & {
   __orcaTextMate?: TextMateDiagnostics
-}
+} = globalThis
 try {
   globalWithTextMateDiagnostics.__orcaTextMate = textMateDiagnostics
 } catch {
@@ -108,7 +119,9 @@ function recordScheduledReassert(languageId: string): void {
 }
 
 function assertOwnedProviderOnAllTargets(languageId: string): void {
-  if (!ownedProviders.has(languageId)) return
+  if (!ownedProviders.has(languageId)) {
+    return
+  }
 
   internalProviderRegistration = true
   try {
@@ -129,7 +142,9 @@ function assertOwnedProviderOnAllTargets(languageId: string): void {
 }
 
 function reassertOwnedProvider(languageId: string): void {
-  if (internalProviderRegistration || !ownedProviders.has(languageId)) return
+  if (internalProviderRegistration || !ownedProviders.has(languageId)) {
+    return
+  }
 
   assertOwnedProviderOnAllTargets(languageId)
   recordReassert(languageId)
@@ -145,7 +160,9 @@ function runScheduledReassert(languageId: string): void {
 }
 
 function scheduleReasserts(languageId: string): void {
-  if (scheduledReassertLanguageIds.has(languageId)) return
+  if (scheduledReassertLanguageIds.has(languageId)) {
+    return
+  }
   scheduledReassertLanguageIds.add(languageId)
 
   for (const delay of reassertDelaysMs) {
@@ -159,14 +176,18 @@ function scheduleReasserts(languageId: string): void {
 
 // Monaco が basic-languages の Monarch を遅延 import して後から登録し直すため、先に登録した TextMate の provider が奪われる。
 function installProviderGuard(): void {
-  if (providerGuardInstalled) return
+  if (providerGuardInstalled) {
+    return
+  }
 
-  const languageApis = [
-    monaco.languages as unknown as LanguageApi,
-    coreLanguages as unknown as LanguageApi
-  ]
+  const languageApis: unknown[] = [monaco.languages, coreLanguages]
   for (const languages of languageApis) {
-    if (wrappedLanguageTargets.some((target) => target.languages === languages)) continue
+    if (!isLanguageApi(languages)) {
+      continue
+    }
+    if (wrappedLanguageTargets.some((target) => target.languages === languages)) {
+      continue
+    }
 
     const originalSetTokensProvider = languages.setTokensProvider
     const originalSetMonarchTokensProvider = languages.setMonarchTokensProvider
@@ -186,10 +207,7 @@ function installProviderGuard(): void {
       return disposable
     }
 
-    languages.setMonarchTokensProvider = function (
-      this: unknown,
-      ...args: unknown[]
-    ): unknown {
+    languages.setMonarchTokensProvider = function (this: unknown, ...args: unknown[]): unknown {
       const languageId = args[0]
       const disposable = originalSetMonarchTokensProvider.apply(this, args)
       if (!internalProviderRegistration && typeof languageId === 'string') {
@@ -219,7 +237,9 @@ function registerTextMateProvider(languageId: string, provider: unknown): unknow
           languageId,
           provider
         )
-        if (index === 0) firstDisposable = disposable
+        if (index === 0) {
+          firstDisposable = disposable
+        }
       } catch (error) {
         if (!hasRegistrationError) {
           hasRegistrationError = true
@@ -227,7 +247,9 @@ function registerTextMateProvider(languageId: string, provider: unknown): unknow
         }
       }
     }
-    if (hasRegistrationError) throw registrationError
+    if (hasRegistrationError) {
+      throw registrationError
+    }
 
     ownedProviders.set(languageId, provider)
     recordProviderActive()
@@ -255,8 +277,12 @@ function ensureLanguageProvider(
   languageId: string,
   themeScopeIndex: ReturnType<typeof buildThemeScopeIndex>
 ): void {
-  if (!Object.prototype.hasOwnProperty.call(textMateLanguageScopes, languageId)) return
-  if (registeredLanguageIds.has(languageId)) return
+  if (!Object.hasOwn(textMateLanguageScopes, languageId)) {
+    return
+  }
+  if (registeredLanguageIds.has(languageId)) {
+    return
+  }
 
   registeredLanguageIds.add(languageId)
   recordRegistrationStarted(languageId)
@@ -268,7 +294,9 @@ function ensureLanguageProvider(
 }
 
 export function configureMonacoTextMate(): void {
-  if (configured) return
+  if (configured) {
+    return
+  }
   configured = true
   installProviderGuard()
 

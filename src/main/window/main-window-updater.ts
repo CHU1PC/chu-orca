@@ -26,7 +26,9 @@ const UPDATER_SETUP_FALLBACK_MS = 15_000
 let pendingAutoUpdaterSetup: (() => void) | null = null
 
 export function ensureAutoUpdaterConfigured(): void {
-  if (isPatchedTestFlavor()) return
+  if (isPatchedTestFlavor()) {
+    return
+  }
   pendingAutoUpdaterSetup?.()
 }
 
@@ -38,7 +40,9 @@ export function scheduleMainWindowAutoUpdaterSetup(
     updateInstallMode?: UpdateInstallMode
   }
 ): void {
-  if (isPatchedTestFlavor()) return
+  if (isPatchedTestFlavor()) {
+    return
+  }
   // Why: setupAutoUpdater sync-require()s electron-updater (slow on cold Windows w/ Defender, #7225), so defer past first paint; timer fallback covers crash-looping renderers.
   let updaterSetupDone = false
   const setupAutoUpdaterDeferred = (): void => {

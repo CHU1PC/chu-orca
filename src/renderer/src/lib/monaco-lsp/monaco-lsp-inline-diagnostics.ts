@@ -1,14 +1,24 @@
-import type * as MonacoNamespace from 'monaco-editor'
-import type { IDisposable, editor } from 'monaco-editor'
+import type { IDisposable, Uri, editor } from 'monaco-editor'
 
-type MonacoApi = typeof MonacoNamespace
+type InlineDiagnosticsMonacoApi = {
+  MarkerSeverity: InlineDiagnosticSeverityValues
+  editor: {
+    getModelMarkers: (filter: {
+      owner?: string
+      resource?: Uri
+      take?: number
+    }) => InlineDiagnosticMarker[]
+    onDidChangeMarkers: (
+      listener: (uris: readonly { toString: () => string }[]) => void
+    ) => IDisposable
+  }
+}
 
 export const INLINE_DIAGNOSTIC_MAX_MESSAGE_LENGTH = 160
 export const INLINE_DIAGNOSTIC_MAX_LINES_PER_MODEL = 200
 export const INLINE_DIAGNOSTIC_INCLUDE_SOURCE = false
 export const INLINE_DIAGNOSTIC_LEFT_MARGIN = '8px'
-export const INLINE_DIAGNOSTIC_ERROR_COLOR_TOKEN =
-  'var(--vscode-editorError-foreground, #d78787)'
+export const INLINE_DIAGNOSTIC_ERROR_COLOR_TOKEN = 'var(--vscode-editorError-foreground, #d78787)'
 export const INLINE_DIAGNOSTIC_WARNING_COLOR_TOKEN =
   'var(--vscode-editorWarning-foreground, #d4ad61)'
 
@@ -76,10 +86,7 @@ export function buildInlineDiagnosticDecorations(
 ): InlineDiagnosticDecorationDescriptor[] {
   const bestByLine = new Map<number, InlineDiagnosticMarker>()
   for (const marker of markers) {
-    if (
-      marker.severity !== severityValues.Error &&
-      marker.severity !== severityValues.Warning
-    ) {
+    if (marker.severity !== severityValues.Error && marker.severity !== severityValues.Warning) {
       continue
     }
     if (!Number.isInteger(marker.startLineNumber) || marker.startLineNumber < 1) {
@@ -168,20 +175,36 @@ function ensureInlineDiagnosticStyles(): void {
   document.head.appendChild(style)
 }
 
+type InlineDiagnosticsEditor = Pick<
+  editor.ICodeEditor,
+  'createDecorationsCollection' | 'onDidDispose'
+>
+type InlineDiagnosticsModel = Pick<
+  editor.ITextModel,
+  'uri' | 'isDisposed' | 'getLineMaxColumn' | 'onWillDispose'
+>
+
+type InlineDiagnosticsCollection = {
+  set: (decorations: InlineDiagnosticDecorationDescriptor[]) => void
+  clear: () => void
+}
+
 type TrackedModel = {
-  editor: editor.ICodeEditor
-  model: editor.ITextModel
-  collection: editor.IEditorDecorationsCollection
+  editor: InlineDiagnosticsEditor
+  model: InlineDiagnosticsModel
+  collection: InlineDiagnosticsCollection
   modelDispose: IDisposable
   editorDispose: IDisposable
 }
 
 export type InlineDiagnosticsWiring = IDisposable & {
-  trackModel: (editorInstance: editor.ICodeEditor, model: editor.ITextModel) => () => void
+  trackModel: (editorInstance: InlineDiagnosticsEditor, model: InlineDiagnosticsModel) => () => void
 }
 
-export function createInlineDiagnosticsWiring(monaco: MonacoApi): InlineDiagnosticsWiring {
-  const trackedModels = new Map<editor.ICodeEditor, TrackedModel>()
+export function createInlineDiagnosticsWiring(
+  monaco: InlineDiagnosticsMonacoApi
+): InlineDiagnosticsWiring {
+  const trackedModels = new Map<InlineDiagnosticsEditor, TrackedModel>()
   const pendingRefreshes = new Set<TrackedModel>()
   let refreshScheduled = false
   let disposed = false
@@ -239,7 +262,7 @@ export function createInlineDiagnosticsWiring(monaco: MonacoApi): InlineDiagnost
   }
 
   const wiring = {
-    trackModel(editorInstance: editor.ICodeEditor, model: editor.ITextModel): () => void {
+    trackModel(editorInstance: InlineDiagnosticsEditor, model: InlineDiagnosticsModel): () => void {
       if (disposed || model.isDisposed()) {
         return () => {}
       }
@@ -252,8 +275,8 @@ export function createInlineDiagnosticsWiring(monaco: MonacoApi): InlineDiagnost
         editor: editorInstance,
         model,
         collection: editorInstance.createDecorationsCollection(),
-        modelDispose: undefined as unknown as IDisposable,
-        editorDispose: undefined as unknown as IDisposable
+        modelDispose: { dispose: () => {} },
+        editorDispose: { dispose: () => {} }
       }
       tracked.modelDispose = model.onWillDispose(() => {
         if (trackedModels.get(editorInstance) !== tracked) {

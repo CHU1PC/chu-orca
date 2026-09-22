@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { editor } from 'monaco-editor'
 import {
   INLINE_DIAGNOSTIC_ERROR_CLASS,
   INLINE_DIAGNOSTIC_ERROR_LINE_CLASS,
@@ -7,7 +8,8 @@ import {
   INLINE_DIAGNOSTIC_WARNING_CLASS,
   INLINE_DIAGNOSTIC_WARNING_LINE_CLASS,
   buildInlineDiagnosticDecorations,
-  createInlineDiagnosticsWiring
+  createInlineDiagnosticsWiring,
+  type InlineDiagnosticDecorationDescriptor
 } from './monaco-lsp-inline-diagnostics'
 
 const severityValues = { Error: 8, Warning: 4 }
@@ -23,9 +25,7 @@ function marker(
 }
 
 function messageOptions(
-  decoration:
-    | { options: { after?: { content: string; inlineClassName: string } } }
-    | undefined
+  decoration: { options: { after?: { content: string; inlineClassName: string } } } | undefined
 ): { content: string; inlineClassName: string } {
   const after = decoration?.options.after
   if (!after) {
@@ -35,7 +35,8 @@ function messageOptions(
 }
 
 describe('buildInlineDiagnosticDecorations', () => {
-  const endColumn = (lineNumber: number): number => (lineNumber === 2 ? 9 : lineNumber === 3 ? 1 : 5)
+  const endColumn = (lineNumber: number): number =>
+    lineNumber === 2 ? 9 : lineNumber === 3 ? 1 : 5
 
   it('adds an error line background before the inline message', () => {
     const decorations = buildInlineDiagnosticDecorations(
@@ -126,7 +127,9 @@ describe('buildInlineDiagnosticDecorations', () => {
       (lineNumber) => (lineNumber === 2 ? 9 : 1),
       severityValues
     )
-    expect([decorations[1], decorations[3]].map(({ range }) => [range.startColumn, range.endColumn])).toEqual([
+    expect(
+      [decorations[1], decorations[3]].map(({ range }) => [range.startColumn, range.endColumn])
+    ).toEqual([
       [9, 9],
       [1, 1]
     ])
@@ -185,12 +188,17 @@ function fakeModel(uri: string): FakeModel {
 function fakeMonaco(model: FakeModel) {
   const markerListeners = new Set<(uris: readonly { toString: () => string }[]) => void>()
   const setCalls: unknown[][] = []
-  const collections: { set: (decorations: unknown[]) => void; clear: () => void }[] = []
+  const collections: {
+    set: (decorations: InlineDiagnosticDecorationDescriptor[]) => void
+    clear: () => void
+  }[] = []
   let editorDisposeListener: (() => void) | null = null
   const editorInstance = {
     createDecorationsCollection: () => {
       const collection = {
-        set: vi.fn((decorations: unknown[]) => setCalls.push(decorations)),
+        set: vi.fn((decorations: InlineDiagnosticDecorationDescriptor[]) =>
+          setCalls.push(decorations)
+        ),
         clear: vi.fn()
       }
       collections.push(collection)
@@ -232,8 +240,13 @@ describe('createInlineDiagnosticsWiring', () => {
 
   it('updates the decoration collection when markers change', async () => {
     const fixture = fakeMonaco(fakeModel('file:///a.py'))
-    const wiring = createInlineDiagnosticsWiring(fixture.monaco as never)
-    wiring.trackModel(fixture.editorInstance as never, fixture.model as never)
+    const wiring = createInlineDiagnosticsWiring(fixture.monaco)
+    wiring.trackModel(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fake editor implements every member read by the inline diagnostics wiring.
+      fixture.editorInstance as unknown as editor.ICodeEditor,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fake model implements every member read by the inline diagnostics wiring.
+      fixture.model as unknown as editor.ITextModel
+    )
     const initialCalls = fixture.setCalls.length
     fixture.emitMarkerChange('file:///a.py')
     await Promise.resolve()
@@ -244,8 +257,13 @@ describe('createInlineDiagnosticsWiring', () => {
 
   it('does not write or throw after the model is disposed', async () => {
     const fixture = fakeMonaco(fakeModel('file:///a.py'))
-    const wiring = createInlineDiagnosticsWiring(fixture.monaco as never)
-    wiring.trackModel(fixture.editorInstance as never, fixture.model as never)
+    const wiring = createInlineDiagnosticsWiring(fixture.monaco)
+    wiring.trackModel(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fake editor implements every member read by the inline diagnostics wiring.
+      fixture.editorInstance as unknown as editor.ICodeEditor,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fake model implements every member read by the inline diagnostics wiring.
+      fixture.model as unknown as editor.ITextModel
+    )
     const initialCalls = fixture.setCalls.length
     fixture.model.dispose()
     fixture.emitMarkerChange('file:///a.py')
@@ -256,11 +274,11 @@ describe('createInlineDiagnosticsWiring', () => {
 
   it('removes the old marker listener when Monaco is recreated', () => {
     const fixture = fakeMonaco(fakeModel('file:///a.py'))
-    const oldWiring = createInlineDiagnosticsWiring(fixture.monaco as never)
+    const oldWiring = createInlineDiagnosticsWiring(fixture.monaco)
     expect(fixture.listenerCount()).toBe(1)
     oldWiring.dispose()
     expect(fixture.listenerCount()).toBe(0)
-    const newWiring = createInlineDiagnosticsWiring(fixture.monaco as never)
+    const newWiring = createInlineDiagnosticsWiring(fixture.monaco)
     expect(fixture.listenerCount()).toBe(1)
     newWiring.dispose()
     expect(fixture.listenerCount()).toBe(0)

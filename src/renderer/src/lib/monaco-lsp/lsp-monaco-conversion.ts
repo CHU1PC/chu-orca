@@ -1,9 +1,19 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
 /** Pure LSP↔Monaco shape converters. LSP is 0-based, Monaco 1-based; both use
  *  UTF-16 columns, so only the off-by-one shift is needed. Monaco enum objects
- *  are passed in by the caller so this module stays import-free and node-testable. */
+ *  are passed in by the caller so conversion logic stays node-testable. */
 
 import type { IRange } from 'monaco-editor'
+import {
+  isLspCompletionItem,
+  isLspDiagnostic,
+  isLspMarkedString,
+  isLspRange,
+  isRecord
+} from './lsp-message-guards'
+import type { LspMarkupContent, LspMarkedString, LspPosition, LspRange } from './lsp-message-guards'
+
+export type { LspPosition, LspRange } from './lsp-message-guards'
 
 export const LSP_MARKER_OWNER = 'orca-lsp'
 
@@ -21,14 +31,6 @@ export function lspServerDisplayName(serverId: string): string {
     }[serverId] ?? serverId
   )
 }
-
-export type LspPosition = { line: number; character: number }
-export type LspRange = { start: LspPosition; end: LspPosition }
-
-type LspMarkupContent = { kind?: string; value: string }
-type LspMarkedString = string | { language: string; value: string }
-type LspLocation = { uri: string; range: LspRange }
-type LspLocationLink = { targetUri: string; targetRange: LspRange; targetSelectionRange?: LspRange }
 
 export function toLspPosition(position: { lineNumber: number; column: number }): LspPosition {
   return { line: position.lineNumber - 1, character: position.column - 1 }
@@ -56,14 +58,15 @@ function markedStringToMarkdown(content: LspMarkedString | LspMarkupContent): st
 export function lspHoverToMonaco(
   result: unknown
 ): { contents: { value: string }[]; range?: IRange } | null {
-  const hover = result as {
-    contents?: LspMarkedString | LspMarkupContent | (LspMarkedString | LspMarkupContent)[]
-    range?: LspRange
-  } | null
-  if (!hover?.contents) {
+  if (
+    !isRecord(result) ||
+    (!isLspMarkedString(result.contents) && !Array.isArray(result.contents))
+  ) {
     return null
   }
-  const parts = Array.isArray(hover.contents) ? hover.contents : [hover.contents]
+  const parts = Array.isArray(result.contents)
+    ? result.contents.filter(isLspMarkedString)
+    : [result.contents]
   const contents = parts
     .map(markedStringToMarkdown)
     .filter((value) => value.trim().length > 0)
@@ -71,7 +74,9 @@ export function lspHoverToMonaco(
   if (contents.length === 0) {
     return null
   }
-  return hover.range ? { contents, range: lspRangeToMonaco(hover.range) } : { contents }
+  return isLspRange(result.range)
+    ? { contents, range: lspRangeToMonaco(result.range) }
+    : { contents }
 }
 
 export function lspDefinitionToLocations(result: unknown): { uri: string; range: IRange }[] {
@@ -80,17 +85,24 @@ export function lspDefinitionToLocations(result: unknown): { uri: string; range:
   }
   const items = Array.isArray(result) ? result : [result]
   return items.flatMap((item) => {
-    const link = item as Partial<LspLocationLink> & Partial<LspLocation>
-    if (link.targetUri && link.targetRange) {
+    if (!isRecord(item)) {
+      return []
+    }
+    const targetUri = item.targetUri
+    const targetRange = item.targetRange
+    if (typeof targetUri === 'string' && isLspRange(targetRange)) {
+      const targetSelectionRange = isLspRange(item.targetSelectionRange)
+        ? item.targetSelectionRange
+        : targetRange
       return [
         {
-          uri: link.targetUri,
-          range: lspRangeToMonaco(link.targetSelectionRange ?? link.targetRange)
+          uri: targetUri,
+          range: lspRangeToMonaco(targetSelectionRange)
         }
       ]
     }
-    if (link.uri && link.range) {
-      return [{ uri: link.uri, range: lspRangeToMonaco(link.range) }]
+    if (typeof item.uri === 'string' && isLspRange(item.range)) {
+      return [{ uri: item.uri, range: lspRangeToMonaco(item.range) }]
     }
     return []
   })
@@ -125,18 +137,6 @@ const LSP_COMPLETION_KIND_NAMES: readonly string[] = [
   'TypeParameter'
 ]
 
-type LspCompletionItem = {
-  label: string
-  kind?: number
-  detail?: string
-  documentation?: string | LspMarkupContent
-  sortText?: string
-  filterText?: string
-  insertText?: string
-  insertTextFormat?: number
-  textEdit?: { newText: string; range?: LspRange; insert?: LspRange; replace?: LspRange }
-}
-
 export type MonacoSuggestionShape = {
   label: string
   kind: number
@@ -154,12 +154,12 @@ export function lspCompletionToMonaco(
   defaultRange: IRange,
   enums: { kinds: Record<string, number>; snippetRule: number }
 ): { suggestions: MonacoSuggestionShape[]; incomplete: boolean } {
-  const list = result as
-    | { items?: LspCompletionItem[]; isIncomplete?: boolean }
-    | LspCompletionItem[]
-    | null
-  const items = Array.isArray(list) ? list : (list?.items ?? [])
-  const incomplete = !Array.isArray(list) && list?.isIncomplete === true
+  const items = Array.isArray(result)
+    ? result.filter(isLspCompletionItem)
+    : isRecord(result) && Array.isArray(result.items)
+      ? result.items.filter(isLspCompletionItem)
+      : []
+  const incomplete = isRecord(result) && result.isIncomplete === true
   const suggestions = items.map((item): MonacoSuggestionShape => {
     const editRange = item.textEdit?.range ?? item.textEdit?.insert
     const kindName = LSP_COMPLETION_KIND_NAMES[(item.kind ?? 1) - 1] ?? 'Text'
@@ -189,14 +189,6 @@ export function lspCompletionToMonaco(
   return { suggestions, incomplete }
 }
 
-type LspDiagnostic = {
-  range: LspRange
-  message: string
-  severity?: number
-  code?: string | number | { value: string | number }
-  source?: string
-}
-
 export type MonacoMarkerShape = IRange & {
   severity: number
   message: string
@@ -210,34 +202,31 @@ export function lspDiagnosticsToMonacoMarkers(
   serverId?: string
 ): MonacoMarkerShape[] {
   const severityByLspCode = [severities.Error, severities.Warning, severities.Info, severities.Hint]
-  return (diagnostics as LspDiagnostic[])
-    .filter((diagnostic) => diagnostic?.range && typeof diagnostic.message === 'string')
-    .map((diagnostic) => {
-      const code =
-        typeof diagnostic.code === 'object' && diagnostic.code !== null
-          ? diagnostic.code.value
-          : diagnostic.code
-      const marker: MonacoMarkerShape = {
-        ...lspRangeToMonaco(diagnostic.range),
-        severity: severityByLspCode[(diagnostic.severity ?? 1) - 1] ?? severities.Error,
-        message: diagnostic.message
-      }
-      if (code !== undefined) {
-        marker.code = String(code)
-      }
-      if (diagnostic.source || serverId) {
-        marker.source = diagnostic.source ?? (serverId ? lspServerDisplayName(serverId) : undefined)
-      }
-      return marker
-    })
+  return diagnostics.filter(isLspDiagnostic).map((diagnostic) => {
+    const code =
+      typeof diagnostic.code === 'object' && diagnostic.code !== null
+        ? diagnostic.code.value
+        : diagnostic.code
+    const marker: MonacoMarkerShape = {
+      ...lspRangeToMonaco(diagnostic.range),
+      severity: severityByLspCode[(diagnostic.severity ?? 1) - 1] ?? severities.Error,
+      message: diagnostic.message
+    }
+    if (code !== undefined) {
+      marker.code = String(code)
+    }
+    if (diagnostic.source || serverId) {
+      marker.source = diagnostic.source ?? (serverId ? lspServerDisplayName(serverId) : undefined)
+    }
+    return marker
+  })
 }
 
 /** Pull-diagnostics response (textDocument/diagnostic) → diagnostic items.
  *  Null means "keep the current markers" (kind: 'unchanged' or malformed). */
 export function lspPullDiagnosticsToItems(result: unknown): unknown[] | null {
-  const report = result as { kind?: string; items?: unknown[] } | null
-  if (report?.kind === 'full' && Array.isArray(report.items)) {
-    return report.items
+  if (isRecord(result) && result.kind === 'full' && Array.isArray(result.items)) {
+    return result.items
   }
   return null
 }

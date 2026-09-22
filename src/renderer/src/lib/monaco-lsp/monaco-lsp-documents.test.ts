@@ -15,18 +15,34 @@ import {
   openLspDocumentForModel
 } from './monaco-lsp-documents'
 
-type FakeModel = editor.ITextModel & { setFakeValue: (text: string) => void }
+type FakeModel = editor.ITextModel & {
+  setFakeValue: (text: string) => void
+  contentDispose: ReturnType<typeof vi.fn>
+}
 
 function fakeModel(uri: string, text: string): FakeModel {
   let value = text
+  let disposed = false
+  let disposeListener: (() => void) | null = null
+  const contentDispose = vi.fn()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fake model implements every ITextModel member read by the document lifecycle under test.
   return {
     uri: { toString: () => uri },
     getValue: () => value,
-    isDisposed: () => false,
-    onDidChangeContent: () => ({ dispose: vi.fn() }),
+    isDisposed: () => disposed,
+    onDidChangeContent: () => ({ dispose: contentDispose }),
+    onWillDispose: (listener: () => void) => {
+      disposeListener = listener
+      return { dispose: vi.fn(() => (disposeListener = null)) }
+    },
     setFakeValue: (next: string) => {
       value = next
-    }
+    },
+    dispose: () => {
+      disposed = true
+      disposeListener?.()
+    },
+    contentDispose
   } as unknown as FakeModel
 }
 
@@ -64,6 +80,7 @@ const openParams = {
 function stubLspApi(): {
   openDocument: ReturnType<typeof vi.fn>
   changeDocument: ReturnType<typeof vi.fn>
+  closeDocument: ReturnType<typeof vi.fn>
 } {
   const api = {
     openDocument: vi.fn().mockResolvedValue(OPEN_RESULT),
@@ -72,8 +89,10 @@ function stubLspApi(): {
     request: vi.fn().mockResolvedValue(null),
     onDiagnostics: vi.fn(() => () => {})
   }
-  ;(globalThis as { window?: unknown }).window ??= globalThis
-  ;(window as { api?: unknown }).api = { lsp: api } as never
+  if (typeof window === 'undefined') {
+    Object.defineProperty(globalThis, 'window', { value: globalThis, configurable: true })
+  }
+  Object.assign(window, { api: { lsp: api } })
   return api
 }
 
@@ -126,9 +145,28 @@ describe('openLspDocumentForModel', () => {
   it('clears markers independently for each server when a model closes', async () => {
     stubLspApi()
     const model = fakeModel('file:///w/src/c.py', 'x')
-    await openLspDocumentForModel({ ...openParams, filePath: '/w/src/c.py', model, languageId: 'python' })
+    await openLspDocumentForModel({
+      ...openParams,
+      filePath: '/w/src/c.py',
+      model,
+      languageId: 'python'
+    })
     const cleared: string[] = []
     closeLspDocumentForModel(model.uri.toString(), (_model, serverId) => cleared.push(serverId))
     expect(cleared.sort()).toEqual(['ruff', 'tsgo'])
+  })
+
+  it('detaches listeners and closes sessions when Monaco disposes the model', async () => {
+    const api = stubLspApi()
+    const model = fakeModel('file:///w/src/disposed.ts', 'x')
+    await openLspDocumentForModel({ ...openParams, filePath: '/w/src/disposed.ts', model })
+    await openLspDocumentForModel({ ...openParams, filePath: '/w/src/disposed.ts', model })
+
+    model.dispose()
+    model.dispose()
+
+    expect(model.contentDispose).toHaveBeenCalledTimes(2)
+    expect(api.closeDocument).toHaveBeenCalledTimes(2)
+    expect(getLspEntriesForSessionDocument('lsp-1', OPEN_RESULT.fileUri)).toHaveLength(0)
   })
 })

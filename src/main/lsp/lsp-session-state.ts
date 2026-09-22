@@ -1,5 +1,5 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
-import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import type { ChildProcessWithoutNullStreams } from '../../shared/child-process/run-process'
 
 export type PendingRequest = {
   resolve: (result: unknown) => void

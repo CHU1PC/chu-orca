@@ -12,7 +12,9 @@ it the build is a plain Orca release.
 Executables in `.venv` or `node_modules/.bin` are used only inside workspace
 roots that the user has explicitly trusted. The application reads trust
 settings from a user-owned configuration file outside this repository and
-does not create or write that file. Tilde expansion is not supported.
+does not create or write that file. Tilde expansion is not supported. A trusted-roots entry must match the on-disk path case exactly, because realpath does not fold case on macOS, and a case-mismatched entry is silently ignored.
+
+The vendored TextMate asset licenses are listed in [the renderer license file](../src/renderer/src/lib/monaco-textmate/LICENSES.md).
 
 The LSP code treats nonexistent paths, relative paths, invalid JSON, and
 unreadable files as untrusted.

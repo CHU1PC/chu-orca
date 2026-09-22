@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { pathToFileURL } from 'node:url'
-import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import type { ChildProcessWithoutNullStreams } from '../../shared/child-process/run-process'
 import { describe, expect, it, vi } from 'vitest'
 import { encodeLspMessage, LspMessageDecoder } from './lsp-message-framing'
 import type { LspServerDescriptor } from './lsp-server-catalog'
@@ -17,7 +17,7 @@ import {
 
 type JsonRpcMessage = {
   jsonrpc: '2.0'
-  id?: number
+  id?: number | string
   method?: string
   params?: unknown
   result?: unknown
@@ -26,6 +26,7 @@ type JsonRpcMessage = {
 
 /** Fake server that auto-answers `initialize` and records everything sent to it. */
 function createFakeServer(serverCapabilities: Record<string, unknown> = {}) {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the EventEmitter is populated with the three Node streams and kill method required by the fake child process below.
   const child = new EventEmitter() as ChildProcessWithoutNullStreams & EventEmitter
   const stdin = new PassThrough()
   const stdout = new PassThrough()
@@ -34,6 +35,7 @@ function createFakeServer(serverCapabilities: Record<string, unknown> = {}) {
   const received: JsonRpcMessage[] = []
   const decoder = new LspMessageDecoder()
   stdin.on('data', (chunk: Buffer) => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the decoder only yields JSON values from the fake server's framed messages, whose test messages follow JsonRpcMessage.
     for (const message of decoder.push(chunk) as JsonRpcMessage[]) {
       received.push(message)
       if (message.method === 'initialize' && message.id !== undefined) {
@@ -51,7 +53,7 @@ function createFakeServer(serverCapabilities: Record<string, unknown> = {}) {
   return {
     child,
     received,
-    reply(id: number, result: unknown): void {
+    reply(id: number | string, result: unknown): void {
       stdout.write(encodeLspMessage({ jsonrpc: '2.0', id, result }))
     },
     notify(method: string, params: unknown): void {
@@ -85,10 +87,15 @@ function createManagerWithFakeServer(serverCapabilities?: Record<string, unknown
 
 function createTerminationFake(mode: 'exit-on-shutdown' | 'term-exits' | 'ignores-term') {
   const fake = createFakeServer()
-  const processState = fake.child as unknown as { exitCode: number | null; signalCode: NodeJS.Signals | null }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fake child receives the exitCode and signalCode fields used by childHasExited.
+  const processState = fake.child as unknown as {
+    exitCode: number | null
+    signalCode: NodeJS.Signals | null
+  }
   Object.assign(processState, { exitCode: null, signalCode: null })
   const decoder = new LspMessageDecoder()
   fake.child.stdin.on('data', (chunk: Buffer) => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the decoder only yields JSON values from the fake server's framed messages, whose test messages follow JsonRpcMessage.
     for (const message of decoder.push(chunk) as JsonRpcMessage[]) {
       if (message.method === 'shutdown' && mode === 'exit-on-shutdown') {
         processState.exitCode = 0
@@ -137,6 +144,7 @@ describe('createLspSessionManager', () => {
     expect(first.sessions[0]?.pullDiagnostics).toBe(false)
     expect(spawnServer).toHaveBeenCalledTimes(1)
     const initialize = fake.received.find((message) => message.method === 'initialize')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fake initialize request is emitted with the workspace configuration capability shape asserted below.
     const initializeParams = initialize?.params as
       | { capabilities?: { workspace?: { configuration?: boolean } } }
       | undefined
@@ -158,7 +166,7 @@ describe('createLspSessionManager', () => {
     fake.requestFromServer('cfg-1', 'workspace/configuration', {
       items: [{ section: 'a' }, { section: 'b' }]
     })
-    const reply = await fake.waitFor((m) => (m.id as unknown) === 'cfg-1' && m.method === undefined)
+    const reply = await fake.waitFor((m) => m.id === 'cfg-1' && m.method === undefined)
     expect(reply.result).toEqual([null, null])
   })
 
@@ -177,18 +185,14 @@ describe('createLspSessionManager', () => {
     fake.requestFromServer('cfg-python', 'workspace/configuration', {
       items: [{ section: 'python' }, { section: 'pyright' }, { section: 'unknown' }]
     })
-    const configuration = await fake.waitFor(
-      (m) => (m.id as unknown) === 'cfg-python' && m.method === undefined
-    )
+    const configuration = await fake.waitFor((m) => m.id === 'cfg-python' && m.method === undefined)
     expect(configuration.result).toEqual([null, null, null])
     fake.requestFromServer('register', 'client/registerCapability', { registrations: [] })
     expect(
-      (await fake.waitFor((m) => (m.id as unknown) === 'register' && m.method === undefined)).result
+      (await fake.waitFor((m) => m.id === 'register' && m.method === undefined)).result
     ).toBeNull()
     fake.requestFromServer('unknown', 'server/unknown', {})
-    const unknown = await fake.waitFor(
-      (m) => (m.id as unknown) === 'unknown' && m.method === undefined
-    )
+    const unknown = await fake.waitFor((m) => m.id === 'unknown' && m.method === undefined)
     expect(unknown.error).toEqual({ code: -32601, message: 'Method not found: server/unknown' })
   })
 
@@ -218,9 +222,7 @@ describe('createLspSessionManager', () => {
     fake.requestFromServer('cfg-venv', 'workspace/configuration', {
       items: [{ section: 'python' }, { section: 'pyright' }]
     })
-    const configuration = await fake.waitFor(
-      (m) => (m.id as unknown) === 'cfg-venv' && m.method === undefined
-    )
+    const configuration = await fake.waitFor((m) => m.id === 'cfg-venv' && m.method === undefined)
     expect(configuration.result).toEqual([
       { pythonPath: join(root, '.venv', 'bin', 'python') },
       null
@@ -274,6 +276,7 @@ describe('createLspSessionManager', () => {
     await fake.waitFor((m) => m.method === 'textDocument/didClose')
     const changes = fake.received.filter((m) => m.method === 'textDocument/didChange')
     expect(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every didChange test message carries the textDocument version shape emitted by sendDidChange.
       changes.map((m) => (m.params as { textDocument: { version: number } }).textDocument.version)
     ).toEqual([2, 3, 4])
     expect(fake.received.filter((m) => m.method === 'textDocument/didClose')).toHaveLength(1)
@@ -304,6 +307,7 @@ describe('createLspSessionManager', () => {
     await manager.openDocument({ ...openArgs, filePath: '/workspace/repo/src/App.tsx' })
     const didOpen = await fake.waitFor((m) => m.method === 'textDocument/didOpen')
     expect(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the didOpen test message is emitted with a textDocument containing languageId.
       (didOpen.params as { textDocument: { languageId: string } }).textDocument.languageId
     ).toBe('typescriptreact')
   })
@@ -315,9 +319,9 @@ describe('createLspSessionManager', () => {
     await fake.waitFor((m) => m.method === 'textDocument/definition')
     fake.child.emit('exit', 1)
     await expect(pending).rejects.toThrow('LSP server exited')
-    await expect(manager.request(opened.sessions[0]!.sessionId, 'textDocument/hover', {})).rejects.toThrow(
-      'Unknown LSP session'
-    )
+    await expect(
+      manager.request(opened.sessions[0]!.sessionId, 'textDocument/hover', {})
+    ).rejects.toThrow('Unknown LSP session')
   })
 
   it('kills every child on disposeAll', async () => {

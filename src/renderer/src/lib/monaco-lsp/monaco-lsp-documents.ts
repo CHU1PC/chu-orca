@@ -26,7 +26,8 @@ export type LspDocumentEntry = {
   refCount: number
   changeTimer: ReturnType<typeof setTimeout> | null
   lastSync: Promise<void>
-  contentListener: IDisposable
+  contentListener: IDisposable | null
+  modelDispose: IDisposable | null
 }
 
 const entriesByModelUri = new Map<string, LspDocumentEntry[]>()
@@ -50,6 +51,13 @@ function unregisterSessionDocumentEntry(entry: LspDocumentEntry): void {
   if (entries?.size === 0) {
     entriesBySessionDocument.delete(key)
   }
+}
+
+function disposeEntryListeners(entry: LspDocumentEntry): void {
+  entry.contentListener?.dispose()
+  entry.contentListener = null
+  entry.modelDispose?.dispose()
+  entry.modelDispose = null
 }
 
 async function pullDiagnosticsNow(entry: LspDocumentEntry): Promise<void> {
@@ -114,15 +122,19 @@ export async function openLspDocumentForModel(params: {
   }
   setLspFileStatus(filePath, { state: 'starting', servers: [] })
   const openedText = model.getValue()
-  let opened: { sessions?: {
-    sessionId: string
-    fileUri: string
-    serverId: string
-    resolvedCommand: string
-    source: 'project' | 'PATH'
-    isPrimary: boolean
-    pullDiagnostics: boolean
-  }[]; fileUri?: string | null; projectToolsSkippedReason?: string }
+  let opened: {
+    sessions?: {
+      sessionId: string
+      fileUri: string
+      serverId: string
+      resolvedCommand: string
+      source: 'project' | 'PATH'
+      isPrimary: boolean
+      pullDiagnostics: boolean
+    }[]
+    fileUri?: string | null
+    projectToolsSkippedReason?: string
+  }
   try {
     opened = await window.api.lsp.openDocument({ filePath, rootPath, languageId, text: openedText })
   } catch {
@@ -171,13 +183,20 @@ export async function openLspDocumentForModel(params: {
       refCount: 1,
       changeTimer: null,
       lastSync: Promise.resolve(),
-      contentListener: undefined as unknown as IDisposable
+      contentListener: null,
+      modelDispose: null
     }
     entry.contentListener = model.onDidChangeContent(() => {
       if (entry.changeTimer !== null) {
         clearTimeout(entry.changeTimer)
       }
       entry.changeTimer = setTimeout(() => sendChangeNow(entry), CHANGE_DEBOUNCE_MS)
+    })
+    entry.modelDispose = model.onWillDispose(() => {
+      if (entriesByModelUri.get(modelUri)?.includes(entry)) {
+        entry.modelDispose = null
+        closeLspDocumentForModel(modelUri, () => {}, true)
+      }
     })
     entries.push(entry)
   }
@@ -232,23 +251,26 @@ export function getLspEntriesForSessionDocument(
 
 export function closeLspDocumentForModel(
   modelUri: string,
-  clearMarkers: (model: editor.ITextModel, serverId: string) => void
+  clearMarkers: (model: editor.ITextModel, serverId: string) => void,
+  force = false
 ): void {
   const entries = entriesByModelUri.get(modelUri)
   if (!entries) {
     return
   }
-  for (const entry of entries) {
-    entry.refCount--
-  }
-  if (entries.some((entry) => entry.refCount > 0)) {
-    return
+  if (!force) {
+    for (const entry of entries) {
+      entry.refCount--
+    }
+    if (entries.some((entry) => entry.refCount > 0)) {
+      return
+    }
   }
   entriesByModelUri.delete(modelUri)
   setLspFileStatus(entries[0]?.filePath ?? '', null)
   for (const entry of entries) {
     unregisterSessionDocumentEntry(entry)
-    entry.contentListener.dispose()
+    disposeEntryListeners(entry)
     if (entry.changeTimer !== null) {
       clearTimeout(entry.changeTimer)
       entry.changeTimer = null

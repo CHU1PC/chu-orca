@@ -1,5 +1,5 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { isCommandOnLocalPath } from '../ipc/command-path-resolver'
 import {
   getProjectToolsSkippedReason as getSkippedReason,
@@ -109,7 +109,10 @@ function localCommandPath(
       localCommandDirectory === 'python-venv'
         ? join(base, 'bin', command)
         : join(base, '.bin', command)
-    if (isExecutableFile(commandPath) && isSafeProjectCommand(commandPath, rootPath, localCommandDirectory)) {
+    if (
+      isExecutableFile(commandPath) &&
+      isSafeProjectCommand(commandPath, rootPath, localCommandDirectory)
+    ) {
       return localCommandDirectory === 'python-venv'
         ? {
             command: commandPath,
@@ -158,10 +161,7 @@ function pathCommandPath(command: string): string | null {
     return isExecutableFile(command) ? command : null
   }
   const pathValue = process.env.PATH ?? ''
-  for (const directory of pathValue.split(':')) {
-    if (!directory) {
-      continue
-    }
+  for (const directory of pathValue.split(delimiter).filter(Boolean)) {
     const candidate = resolve(directory, command)
     if (isExecutableFile(candidate)) {
       return candidate
@@ -185,7 +185,12 @@ async function resolveDescriptor(
     entry.localCommandDirectory
   )
   if (trustedRoot) {
-    const local = localCommandPath(filePath, rootPath, descriptor.command, entry.localCommandDirectory)
+    const local = localCommandPath(
+      filePath,
+      rootPath,
+      descriptor.command,
+      entry.localCommandDirectory
+    )
     if (local) {
       return local
     }
@@ -300,7 +305,9 @@ export function getProjectToolsSkippedReason(
     filePath,
     rootPath,
     entry.localCommandDirectory,
-    [...entry.candidates, ...(entry.additionalServers ?? [])].map((descriptor) => descriptor.command),
+    [...entry.candidates, ...(entry.additionalServers ?? [])].map(
+      (descriptor) => descriptor.command
+    ),
     options
   )
 }
