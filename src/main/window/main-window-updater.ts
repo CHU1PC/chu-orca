@@ -5,6 +5,7 @@ import { RELEASE_CHANNELS, type ReleaseChannel } from '../../shared/release-chan
 import { isTrustedUIRenderer } from '../ipc/ui'
 import type { Store } from '../persistence'
 import { logStartupMilestone } from '../startup/startup-diagnostics'
+import { isPatchedTestFlavor } from '../orca-patched/flavor'
 import {
   checkForUpdatesFromMenu,
   dismissAvailableUpdate,
@@ -25,6 +26,7 @@ const UPDATER_SETUP_FALLBACK_MS = 15_000
 let pendingAutoUpdaterSetup: (() => void) | null = null
 
 export function ensureAutoUpdaterConfigured(): void {
+  if (isPatchedTestFlavor()) return
   pendingAutoUpdaterSetup?.()
 }
 
@@ -36,6 +38,7 @@ export function scheduleMainWindowAutoUpdaterSetup(
     updateInstallMode?: UpdateInstallMode
   }
 ): void {
+  if (isPatchedTestFlavor()) return
   // Why: setupAutoUpdater sync-require()s electron-updater (slow on cold Windows w/ Defender, #7225), so defer past first paint; timer fallback covers crash-looping renderers.
   let updaterSetupDone = false
   const setupAutoUpdaterDeferred = (): void => {

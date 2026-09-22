@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { getVersionManagerBinPaths } from '../codex-cli/command'
 import { getMainE2EConfig } from '../e2e-config'
+import { isPatchedTestFlavor } from '../orca-patched/flavor'
 import { DISABLED_CHROMIUM_FEATURES } from './disabled-chromium-features'
 import { readHttp1CompatibilityMarker } from './http1-compatibility-marker'
 
@@ -235,6 +236,7 @@ export function configureOrcaUserDataPathEnv(): void {
 }
 
 export function shouldInstallManagedHooks(isDev: boolean): boolean {
+  if (isPatchedTestFlavor()) return false
   void isDev
   // Why: managed hooks now target Orca-owned Codex homes, not ~/.codex, so keep install on for all agents until each gets its own seam.
   return true

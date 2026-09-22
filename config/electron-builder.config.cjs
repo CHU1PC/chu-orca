@@ -68,7 +68,7 @@ const devChannelRepo = isHourlyChannel
     : isAdhocChannel
       ? 'orca-adhoc'
       : null
-const appId = 'com.stablyai.orca'
+const appId = process.env.ORCA_PATCHED_FLAVOR === 'test' ? 'com.chu1.orca-patch' : 'com.stablyai.orca'
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
   to: 'onboarding/feature-wall'
@@ -165,8 +165,8 @@ const windowsRuntimeResources = existsSync(
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId,
-  productName: 'Orca',
-  protocols: [{ name: 'Orca', schemes: ['orca'] }],
+  productName: process.env.ORCA_PATCHED_FLAVOR === 'test' ? 'Orca-Patch' : 'Orca',
+  protocols: process.env.ORCA_PATCHED_FLAVOR === 'test' ? [] : [{ name: 'Orca', schemes: ['orca'] }],
   toolsets: { appimage: '1.0.3' },
   ...(devChannelBuildVersion
     ? { extraMetadata: { version: devChannelBuildVersion } }
@@ -475,7 +475,7 @@ module.exports = {
     // Why rank Alternate: Orca joins Finder's "Open With" list for Markdown without claiming
     // LSHandlerRank ownership, so whichever editor the user already prefers stays the default.
     // Why one entry per extension: app-builder-lib globs `*.${ext}`, which an array would break.
-    fileAssociations: MARKDOWN_FILE_EXTENSIONS.map((ext) => ({
+    fileAssociations: process.env.ORCA_PATCHED_FLAVOR === 'test' ? [] : MARKDOWN_FILE_EXTENSIONS.map((ext) => ({
       ext,
       name: 'Markdown Document',
       description: 'Markdown Document',

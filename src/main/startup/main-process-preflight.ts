@@ -31,6 +31,7 @@ import {
   isQuittingForUpdate
 } from '../updater'
 import { getDevInstanceIdentity, shouldApplyPreReadyAppName } from './dev-instance-identity'
+import { applyPatchedTestFlavorIdentity, configurePatchedTestUserDataPath } from '../orca-patched/flavor'
 import { enableRendererHeapHeadroom } from './renderer-heap-headroom'
 import { isStartupDiagnosticsEnabled, logStartupDiagnostic } from './startup-diagnostics'
 import { startEventLoopStallProbe } from './event-loop-stall-probe'
@@ -123,6 +124,7 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
     reserveServeStdoutForReadiness()
   }
   state.devInstanceIdentity = getDevInstanceIdentity(is.dev)
+  state.devInstanceIdentity = applyPatchedTestFlavorIdentity(state.devInstanceIdentity)
   state.devAgentHookEndpointNamespace = state.devInstanceIdentity.isDev
     ? state.devInstanceIdentity.appUserModelId
     : undefined
@@ -169,6 +171,7 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   installMainProcessTreeKillGate()
   const isDev = is.dev
   configureDevUserDataPath(isDev)
+  configurePatchedTestUserDataPath()
   configureOrcaUserDataPathEnv()
   // Why these four lines are one step (#16761): the two above decide where userData lives, and
   // everything below may resolve a path. Installing the accessor any later leaves a window where an
