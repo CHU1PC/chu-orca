@@ -1,14 +1,11 @@
 # Orca patch fork
 
 This directory contains the tooling and notes for the private Orca fork.
-The repository is based on upstream Orca v1.4.206 and carries two branches:
-
-- `patched`: the release-flavour fork with LSP and TextMate support.
-- `patched-test`: the test-flavour fork with a separate application identity.
-
-The fork now carries its changes as ordinary Git commits. The `lsp` changes
-are committed on `patched`, and the `identity` changes are committed on top of
-it on `patched-test`. Check out the branch you need before building.
+The repository is based on upstream Orca v1.4.206 and carries a single
+`patched` branch with the LSP and TextMate support plus the test-flavour
+identity switch. Both flavours build from `patched`; `ORCA_PATCHED_FLAVOR=test`
+(set by `build-test.sh`) selects the isolated Orca-Patch identity, and without
+it the build is a plain Orca release.
 
 ## LSP workspace trust
 
@@ -68,7 +65,7 @@ Install dependencies once from the repository root:
 corepack pnpm install --frozen-lockfile
 ```
 
-Build the test flavour from the `patched-test` branch:
+Build the test flavour from the `patched` branch:
 
 ```sh
 ./patch/build-test.sh
