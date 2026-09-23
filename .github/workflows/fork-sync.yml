@@ -1,0 +1,210 @@
+name: fork-sync
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Optional stable upstream release tag to target
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_URL: https://github.com/stablyai/orca.git
+  FORK_REPOSITORY: ${{ github.repository }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      old: ${{ steps.decide.outputs.old }}
+      new: ${{ steps.decide.outputs.new }}
+    steps:
+      - name: Check out patched
+        uses: actions/checkout@v4
+        with:
+          ref: patched
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Sync fork main
+        id: sync_main
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+        run: gh repo sync "$FORK_REPOSITORY" -b main
+
+      - name: Close recovered sync-main issues
+        if: steps.sync_main.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+          REPO: ${{ env.FORK_REPOSITORY }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash patch/ci/close-sync-main-issues.sh
+
+      - name: Fetch upstream release tags
+        id: fetch_tags
+        if: steps.sync_main.outcome == 'success' || steps.sync_main.outcome == 'failure'
+        run: bash patch/ci/fetch-upstream-tags.sh --url "$UPSTREAM_URL"
+
+      - name: Detect target and current base
+        id: detect_target
+        if: steps.fetch_tags.outcome == 'success'
+        env:
+          FORCED_TAG: ${{ inputs.tag }}
+        run: bash patch/ci/detect-target-tag.sh --upstream "$UPSTREAM_URL" --branch patched >> "$GITHUB_OUTPUT"
+
+      - name: Check for an open failure issue
+        id: check_open_issue
+        if: steps.detect_target.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+          REPO: ${{ env.FORK_REPOSITORY }}
+          TARGET_TAG: ${{ steps.detect_target.outputs.new }}
+        run: bash patch/ci/has-open-failure-issue.sh --tag "$TARGET_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether to rebase
+        id: decide
+        if: steps.check_open_issue.outcome == 'success'
+        env:
+          OLD_TAG: ${{ steps.detect_target.outputs.old }}
+          NEW_TAG: ${{ steps.detect_target.outputs.new }}
+          OPEN_ISSUE: ${{ steps.check_open_issue.outputs.open }}
+        run: bash patch/ci/decide-sync.sh --old "$OLD_TAG" --new "$NEW_TAG" --open "$OPEN_ISSUE" >> "$GITHUB_OUTPUT"
+
+      - name: Report check failures
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+          REPO: ${{ env.FORK_REPOSITORY }}
+          TARGET_TAG: ${{ steps.detect_target.outputs.new || 'unknown' }}
+          OLD_TAG: ${{ steps.detect_target.outputs.old || 'unknown' }}
+          NEW_TAG: ${{ steps.detect_target.outputs.new || 'unknown' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SYNC_MAIN_OUTCOME: ${{ steps.sync_main.outcome }}
+          FETCH_TAGS_OUTCOME: ${{ steps.fetch_tags.outcome }}
+          DETECT_TARGET_OUTCOME: ${{ steps.detect_target.outcome }}
+          CHECK_OPEN_ISSUE_OUTCOME: ${{ steps.check_open_issue.outcome }}
+          DECIDE_SYNC_OUTCOME: ${{ steps.decide.outcome }}
+          MODE: check
+        run: bash patch/ci/report-failure-issues.sh
+
+  rebase:
+    needs: check
+    if: needs.check.outputs.run == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      OLD_TAG: ${{ needs.check.outputs.old }}
+      NEW_TAG: ${{ needs.check.outputs.new }}
+      TARGET_TAG: ${{ needs.check.outputs.new }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Check out patched
+        uses: actions/checkout@v4
+        with:
+          ref: patched
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 'Rebase: fetch tags and record SHA'
+        id: fetch_rebase
+        run: |
+          printf 'RECORDED_SHA=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          bash patch/ci/fetch-upstream-tags.sh \
+            --url "$UPSTREAM_URL" \
+            --tag "$OLD_TAG" \
+            --tag "$NEW_TAG"
+
+      - name: 'Rebase: configure Git identity'
+        id: rebase_identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: 'Rebase: apply release base'
+        id: rebase
+        run: bash patch/ci/rebase-onto-tag.sh "$OLD_TAG" "$NEW_TAG" patched "$RUNNER_TEMP/rebase-conflicts.txt"
+
+      - name: Set up Node.js 24
+        id: setup_node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Install dependencies
+        id: install
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        id: typecheck
+        run: pnpm tc
+
+      - name: Focused tests
+        id: test
+        run: pnpm test src/main/lsp src/main/ipc/lsp.test.ts src/main/orca-patched src/renderer/src/lib/monaco-lsp src/renderer/src/lib/monaco-textmate src/renderer/src/components/editor src/main/startup/host-port-bootstrap-wiring.test.ts src/shared/child-process/child-process-import-boundary.test.ts
+
+      - name: Changed-code quality gate
+        id: quality
+        env:
+          ORCA_CODE_QUALITY_BASE: ${{ needs.check.outputs.new }}
+        run: pnpm run check:code-quality:changed
+
+      - name: Package unsigned release
+        id: package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          ./patch/build-release.sh
+          found_app=false
+          for app in dist/mac-arm64/*.app; do
+            if [ -d "$app" ]; then
+              found_app=true
+              break
+            fi
+          done
+          [ "$found_app" = true ]
+
+      - name: Push rebased patched
+        id: push
+        env:
+          FORK_SYNC_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+        run: |
+          set +x
+          auth=$(printf 'x-access-token:%s' "$FORK_SYNC_TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::${auth}"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${auth}" \
+            push --force-with-lease=patched:"$RECORDED_SHA" \
+            "https://github.com/${FORK_REPOSITORY}.git" patched
+
+      - name: Report rebase failures
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+          REPO: ${{ env.FORK_REPOSITORY }}
+          CONFLICTS_FILE: ${{ runner.temp }}/rebase-conflicts.txt
+          FETCH_REBASE_OUTCOME: ${{ steps.fetch_rebase.outcome }}
+          REBASE_IDENTITY_OUTCOME: ${{ steps.rebase_identity.outcome }}
+          REBASE_OUTCOME: ${{ steps.rebase.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          QUALITY_OUTCOME: ${{ steps.quality.outcome }}
+          PACKAGE_OUTCOME: ${{ steps.package.outcome }}
+          PUSH_OUTCOME: ${{ steps.push.outcome }}
+          MODE: rebase
+        run: bash patch/ci/report-failure-issues.sh

@@ -90,3 +90,46 @@ script verifies the built app's `CFBundleIdentifier`.
 The scripts in this directory are copied from the workspace setup directory
 for convenience. The outer setup directories are not part of this Git
 repository.
+
+## Fork CI
+
+The `fork-sync` workflow keeps the fork's `patched` branch rebased onto the
+newest stable upstream Orca release tag. It syncs the fork's `main` branch,
+rebases in a macOS runner, runs the focused checks and quality gate, builds an
+unsigned release, and pushes only after all checks pass. Rebase conflicts and
+other failures are recorded in one labelled issue per release tag and stage.
+
+Before enabling the workflow:
+
+1. Create a fine-grained PAT with repository access to the fork only and
+   `Contents: write`, `Workflows: write`, and `Issues: write` permissions. Set
+   an expiry, and rotate the token before it expires.
+2. Add the PAT as the repository secret `FORK_SYNC_TOKEN`.
+3. Set the fork's default branch to `patched`; scheduled workflows run from
+   the default branch.
+4. Enable Issues in `Settings > General > Features`; forks have Issues
+   disabled by default.
+
+To run it now, press `Run workflow` in the Actions tab, or run the same thing
+from a terminal. Replace `<fork>` with the fork repository in `owner/name`
+form:
+
+```sh
+gh workflow run fork-sync.yml -R <fork> [-f tag=vX.Y.Z]
+```
+
+To recover from a rebase-conflict issue locally, remember that `origin` is the
+fork in a fork clone. Add the upstream remote if it is missing, fetch both
+release tags from upstream, create a backup branch, rebase, compare the patch
+commits, run the checks, and push the resolved branch before closing the issue:
+
+```sh
+git remote get-url upstream >/dev/null 2>&1 || git remote add upstream https://github.com/stablyai/orca.git
+git fetch upstream tag <old> tag <new> --no-tags
+git branch backup patched
+git rebase --onto <new> <old> patched
+git range-diff <old>..backup <new>..patched
+pnpm tc
+pnpm test
+git push --force-with-lease fork patched
+```
