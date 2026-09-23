@@ -1,10 +1,14 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
+import type * as MonacoNamespace from 'monaco-editor'
 import { typescript as monacoTS } from 'monaco-editor'
+import { registerDockerfileLanguageFeatures } from '@/lib/dockerfile/dockerfile-monaco-providers'
+
+type MonacoApi = typeof MonacoNamespace
 
 // Why: Monaco's sandboxed worker cannot resolve project imports, so its
 // semantic results are misleading in workspaces where the local LSP bridge is
 // available. Keep tokenization and features not supplied by the bridge.
-export function configureMonacoLsp(): void {
+export function configureMonacoLsp(monaco: MonacoApi): void {
   const tsWorkerModeConfiguration = {
     completionItems: false,
     hovers: false,
@@ -19,4 +23,5 @@ export function configureMonacoLsp(): void {
     ...monacoTS.javascriptDefaults.modeConfiguration,
     ...tsWorkerModeConfiguration
   })
+  registerDockerfileLanguageFeatures(monaco)
 }

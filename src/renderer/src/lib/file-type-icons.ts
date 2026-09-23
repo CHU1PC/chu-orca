@@ -45,7 +45,14 @@ export function getFileTypeIcon(filePath: string | undefined | null): LucideIcon
     return FileLock
   }
 
-  if (lowerName === 'dockerfile' || lowerName.startsWith('dockerfile.')) {
+  if (
+    lowerName === 'dockerfile' ||
+    lowerName.startsWith('dockerfile.') ||
+    lowerName === 'containerfile' ||
+    lowerName.startsWith('containerfile.') ||
+    lowerName.endsWith('.dockerfile') ||
+    lowerName.endsWith('.containerfile')
+  ) {
     return FileCog
   }
 

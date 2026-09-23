@@ -50,6 +50,62 @@ describe('resolveLspServerForLanguage', () => {
     expect(resolved?.serverId).toBe('typescript-language-server')
   })
 
+  it('declares the Dockerfile language server with node_modules resolution', () => {
+    const dockerfile = LSP_SERVER_CATALOG.find((entry) => entry.languages.includes('dockerfile'))
+    expect(dockerfile?.candidates).toEqual([
+      { serverId: 'dockerfile-language-server', command: 'docker-langserver', args: ['--stdio'] }
+    ])
+    expect(dockerfile?.localCommandDirectory).toBe('node-modules')
+  })
+
+  it('finds the Dockerfile language server in a trusted project node_modules directory', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-lsp-dockerfile-'))
+    const nested = join(root, 'packages', 'app', 'src')
+    const bin = join(root, 'node_modules', '.bin')
+    mkdirSync(nested, { recursive: true })
+    mkdirSync(bin, { recursive: true })
+    const command = join(bin, 'docker-langserver')
+    writeFileSync(command, '')
+    chmodSync(command, 0o755)
+    const resolved = await resolveLspServerForLanguage(
+      'dockerfile',
+      join(nested, 'Dockerfile'),
+      root,
+      () => Promise.resolve(false),
+      { trustedRootsFilePath: trustFile(root) }
+    )
+    expect(resolved?.serverId).toBe('dockerfile-language-server')
+    expect(resolved?.args).toEqual(['--stdio'])
+    expect(resolved?.resolvedCommand).toBe(command)
+    expect(resolved?.source).toBe('project')
+  })
+
+  it('falls back to PATH for the Dockerfile language server', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-lsp-dockerfile-path-'))
+    const resolved = await resolveLspServerForLanguage(
+      'dockerfile',
+      join(root, 'Dockerfile'),
+      root,
+      () => Promise.resolve(true),
+      { trustedRootsFilePath: trustFile(root) }
+    )
+    expect(resolved?.serverId).toBe('dockerfile-language-server')
+    expect(resolved?.source).toBe('PATH')
+  })
+
+  it('returns nothing when the Dockerfile language server is absent', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-lsp-dockerfile-absent-'))
+    await expect(
+      resolveLspServerForLanguage(
+        'dockerfile',
+        join(root, 'Dockerfile'),
+        root,
+        () => Promise.resolve(false),
+        { trustedRootsFilePath: trustFile(root) }
+      )
+    ).resolves.toBeNull()
+  })
+
   it('returns null for unknown languages and when nothing is installed', async () => {
     expect(
       await resolveLspServerForLanguage('plaintext', '/workspace/x', '/workspace', () =>
@@ -57,7 +113,9 @@ describe('resolveLspServerForLanguage', () => {
       )
     ).toBeNull()
     expect(
-      await resolveLspServerForLanguage('go', '/workspace/x', '/workspace', () => Promise.resolve(false))
+      await resolveLspServerForLanguage('go', '/workspace/x', '/workspace', () =>
+        Promise.resolve(false)
+      )
     ).toBeNull()
   })
 

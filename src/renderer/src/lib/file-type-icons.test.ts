@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { describe, expect, it } from 'vitest'
 import { getFileTypeIcon } from './file-type-icons'
+import { detectLanguage } from './language-detect'
 
 describe('getFileTypeIcon', () => {
   it('prefers known filenames over generic extensions', () => {
@@ -28,6 +29,53 @@ describe('getFileTypeIcon', () => {
     expect(getFileTypeIcon('C:\\repo\\.env.local')).toBe(FileLock)
     expect(getFileTypeIcon('README')).toBe(FileText)
     expect(getFileTypeIcon('Dockerfile.dev')).toBe(FileCog)
+  })
+
+  it.each([
+    'Containerfile',
+    'Containerfile.dev',
+    'config/example.dockerfile',
+    'config/example.containerfile'
+  ])('uses the Dockerfile icon for %s', (filePath) => {
+    expect(getFileTypeIcon(filePath)).toBe(FileCog)
+  })
+
+  it('keeps Dockerfile language and icon detection aligned', () => {
+    const dockerfileNames = [
+      'Dockerfile',
+      'Containerfile',
+      'dockerfile',
+      'x.dockerfile',
+      'x.Dockerfile',
+      'x.containerfile',
+      'x.Containerfile',
+      'Dockerfile.dev',
+      'Dockerfile.prod',
+      'Containerfile.dev',
+      'a/b/Dockerfile.dev',
+      'C:\\repo\\Containerfile.dev',
+      'Dockerfile.md',
+      'dockerfile.dev',
+      'DOCKERFILE.DEV',
+      'containerfile',
+      'containerfile.dev',
+      'CONTAINERFILE'
+    ]
+    const nonDockerfileNames = [
+      'dockerfile-notes.md',
+      'Dockerfiles',
+      'MyDockerfile.txt',
+      'docker-compose.yml'
+    ]
+
+    for (const filePath of dockerfileNames) {
+      expect(detectLanguage(filePath)).toBe('dockerfile')
+      expect(getFileTypeIcon(filePath)).toBe(FileCog)
+    }
+    for (const filePath of nonDockerfileNames) {
+      expect(detectLanguage(filePath)).not.toBe('dockerfile')
+      expect(getFileTypeIcon(filePath)).not.toBe(FileCog)
+    }
   })
 
   it('matches common code, config, document, and media extensions', () => {

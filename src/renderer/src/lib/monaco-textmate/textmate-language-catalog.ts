@@ -16,7 +16,8 @@ export const textMateGrammarLoaders: Readonly<Record<string, TextMateGrammarLoad
   'text.html.markdown': () => import('./grammars/markdown.tmLanguage.json'),
   'source.shell': () => import('./grammars/shell.tmLanguage.json'),
   'text.html.basic': () => import('./grammars/html.tmLanguage.json'),
-  'source.css': () => import('./grammars/css.tmLanguage.json')
+  'source.css': () => import('./grammars/css.tmLanguage.json'),
+  'source.dockerfile': () => import('./grammars/dockerfile.tmLanguage.json')
 }
 
 export const textMateLanguageScopes: Readonly<Record<string, string>> = {
@@ -30,7 +31,8 @@ export const textMateLanguageScopes: Readonly<Record<string, string>> = {
   markdown: 'text.html.markdown',
   shell: 'source.shell',
   html: 'text.html.basic',
-  css: 'source.css'
+  css: 'source.css',
+  dockerfile: 'source.dockerfile'
 }
 
 function hasDefaultExport(value: unknown): value is { default: unknown } {

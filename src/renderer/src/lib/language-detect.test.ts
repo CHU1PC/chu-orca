@@ -25,6 +25,38 @@ describe('detectLanguage', () => {
     expect(detectLanguage('C:\\Users\\alice\\repo\\CMakeLists.txt')).toBe('cmake')
   })
 
+  it.each([
+    ['dockerfile.dev', 'dockerfile'],
+    ['DOCKERFILE.DEV', 'dockerfile'],
+    ['containerfile', 'dockerfile'],
+    ['containerfile.dev', 'dockerfile'],
+    ['CONTAINERFILE', 'dockerfile']
+  ])('maps Dockerfile names case-insensitively: %s', (filePath, expected) => {
+    expect(detectLanguage(filePath)).toBe(expected)
+  })
+
+  it.each([
+    ['Dockerfile', 'dockerfile'],
+    ['Containerfile', 'dockerfile'],
+    ['dockerfile', 'dockerfile'],
+    ['x.dockerfile', 'dockerfile'],
+    ['x.Dockerfile', 'dockerfile'],
+    ['x.containerfile', 'dockerfile'],
+    ['x.Containerfile', 'dockerfile'],
+    ['Dockerfile.dev', 'dockerfile'],
+    ['Dockerfile.prod', 'dockerfile'],
+    ['Containerfile.dev', 'dockerfile'],
+    ['a/b/Dockerfile.dev', 'dockerfile'],
+    ['C:\\repo\\Containerfile.dev', 'dockerfile'],
+    ['Dockerfile.md', 'dockerfile'],
+    ['dockerfile-notes.md', 'markdown'],
+    ['Dockerfiles', 'plaintext'],
+    ['MyDockerfile.txt', 'plaintext'],
+    ['docker-compose.yml', 'yaml']
+  ] as const)('maps Dockerfile names precisely: %s', (filePath, expected) => {
+    expect(detectLanguage(filePath)).toBe(expected)
+  })
+
   it('maps Windows Batch files to Monaco built-in Batch language id', () => {
     expect(detectLanguage('scripts/setup.bat')).toBe('bat')
     expect(detectLanguage('C:\\repo\\scripts\\bootstrap.CMD')).toBe('bat')
