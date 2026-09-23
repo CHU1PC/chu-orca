@@ -4,6 +4,9 @@ import type { DockerfileInstruction } from './dockerfile-stage-scanner'
 export type DockerfileStage = {
   index: number
   name?: string
+  nameLine?: number
+  nameStartColumn?: number
+  nameEndColumn?: number
   fromLine: number
   endLine: number
 }
@@ -17,50 +20,113 @@ export type DockerfileStageReference = {
 const isCommentLine = (line: string): boolean => /^\s*#/u.test(line)
 const isBlankLine = (line: string): boolean => /^\s*$/u.test(line)
 
-function instructionTokens(instruction: DockerfileInstruction): string[] {
-  const text = instruction.fragments.join(' ')
+type InstructionToken = {
+  value: string
+  quoted: boolean
+  location?: {
+    line: number
+    startColumn: number
+    endColumn: number
+  }
+}
+
+type InstructionCharacterLocation = { line: number; column: number } | null
+
+function instructionText(instruction: DockerfileInstruction): {
+  text: string
+  locations: InstructionCharacterLocation[]
+} {
+  let text = ''
+  const locations: InstructionCharacterLocation[] = []
+  instruction.fragments.forEach((fragment, index) => {
+    if (index > 0) {
+      text += ' '
+      locations.push(null)
+    }
+    const line = instruction.sourceLines[index] ?? instruction.startLine
+    for (let column = 0; column < fragment.length; column += 1) {
+      text += fragment[column] ?? ''
+      locations.push({ line, column: column + 1 })
+    }
+  })
+  return { text, locations }
+}
+
+function instructionTokens(instruction: DockerfileInstruction): InstructionToken[] {
+  const { text, locations } = instructionText(instruction)
   const commandStart = text.search(/\S/u)
   const commandLength = commandStart < 0 ? text.length : commandStart + instruction.command.length
-  const body = text.slice(commandLength)
-  const tokens: string[] = []
+  const tokens: InstructionToken[] = []
   let token = ''
   let quote: string | null = null
-  for (const character of body) {
+  let tokenStart: InstructionCharacterLocation = null
+  let tokenEnd: InstructionCharacterLocation = null
+  let quoted = false
+  const finishToken = (): void => {
+    if (!token) {
+      tokenStart = null
+      tokenEnd = null
+      quoted = false
+      return
+    }
+    const location =
+      !quoted &&
+      tokenStart &&
+      tokenEnd &&
+      tokenStart.line === tokenEnd.line &&
+      tokenStart.column <= tokenEnd.column
+        ? {
+            line: tokenStart.line,
+            startColumn: tokenStart.column,
+            endColumn: tokenEnd.column + 1
+          }
+        : undefined
+    tokens.push({ value: token, quoted, ...(location ? { location } : {}) })
+    token = ''
+    tokenStart = null
+    tokenEnd = null
+    quoted = false
+  }
+  for (let index = commandLength; index < text.length; index += 1) {
+    const character = text[index] ?? ''
+    const location = locations[index] ?? null
     if (quote) {
       if (character === quote) {
         quote = null
       } else {
         token += character
+        tokenEnd = location
       }
     } else if (character === "'" || character === '"') {
       quote = character
+      quoted = true
     } else if (/\s/u.test(character)) {
-      if (token) {
-        tokens.push(token)
-        token = ''
-      }
+      finishToken()
     } else {
+      tokenStart ??= location
       token += character
+      tokenEnd = location
     }
   }
-  if (token) {
-    tokens.push(token)
-  }
+  finishToken()
   return tokens
 }
 
-function stageName(instruction: DockerfileInstruction): string | undefined {
+function stageName(
+  instruction: DockerfileInstruction
+): { name: string; location?: InstructionToken['location'] } | undefined {
   const tokens = instructionTokens(instruction)
   let imageIndex = 0
-  while (tokens[imageIndex]?.startsWith('--')) {
+  while (tokens[imageIndex]?.value.startsWith('--')) {
     imageIndex += 1
   }
   if (!tokens[imageIndex]) {
     return undefined
   }
   for (let index = imageIndex + 1; index < tokens.length - 1; index += 1) {
-    if (tokens[index]?.toLowerCase() === 'as') {
-      return tokens[index + 1]
+    if (tokens[index]?.value.toLowerCase() === 'as') {
+      const nameToken = tokens[index + 1]
+      return nameToken ? { name: nameToken.value, location: nameToken.location } : undefined
     }
   }
   return undefined
@@ -91,10 +157,21 @@ export function parseDockerfileStages(text: string): DockerfileStage[] {
   const scan = scanDockerfile(text)
   const fromInstructions = scan.instructions.filter(({ command }) => command === 'from')
   return fromInstructions.map((instruction, index) => {
-    const name = stageName(instruction)
+    const stage = stageName(instruction)
     return {
       index,
-      ...(name ? { name } : {}),
+      ...(stage
+        ? {
+            name: stage.name,
+            ...(stage.location
+              ? {
+                  nameLine: stage.location.line,
+                  nameStartColumn: stage.location.startColumn,
+                  nameEndColumn: stage.location.endColumn
+                }
+              : {})
+          }
+        : {}),
       fromLine: instruction.startLine,
       endLine: stageEndLine(
         scan.lines,

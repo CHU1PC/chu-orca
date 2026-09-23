@@ -1,5 +1,9 @@
 import type { CancellationToken, IDisposable, IPosition, editor, languages } from 'monaco-editor'
-import { parseDockerfileStages, resolveDockerfileStageReference } from './dockerfile-stages'
+import {
+  findDockerfileStageReference,
+  parseDockerfileStages,
+  resolveDockerfileStageReference
+} from './dockerfile-stages'
 
 type DockerfileMonacoApi = {
   languages: {
@@ -59,6 +63,28 @@ function createDockerfileDefinitionProvider(): languages.DefinitionProvider {
       )
       if (!stage) {
         return null
+      }
+      const reference = findDockerfileStageReference(
+        model.getValue(),
+        position.lineNumber,
+        position.column
+      )
+      if (
+        reference &&
+        !/^\d+$/u.test(reference.value) &&
+        stage.nameLine !== undefined &&
+        stage.nameStartColumn !== undefined &&
+        stage.nameEndColumn !== undefined
+      ) {
+        return {
+          uri: model.uri,
+          range: {
+            startLineNumber: stage.nameLine,
+            startColumn: stage.nameStartColumn,
+            endLineNumber: stage.nameLine,
+            endColumn: stage.nameEndColumn
+          }
+        }
       }
       return {
         uri: model.uri,

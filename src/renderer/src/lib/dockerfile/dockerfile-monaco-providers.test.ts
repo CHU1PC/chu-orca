@@ -97,6 +97,70 @@ describe('Dockerfile Monaco providers', () => {
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The provider does not read the cancellation token in this test.
       undefined as never
     )
-    expect(definition).toMatchObject({ range: { startLineNumber: 1 } })
+    expect(definition).toMatchObject({
+      range: {
+        startLineNumber: 1,
+        startColumn: 14,
+        endLineNumber: 1,
+        endColumn: 19
+      }
+    })
+  })
+
+  it('returns the exact stage name range for a named reference', () => {
+    const fixture = fakeMonaco()
+    register(fixture)
+    const { definitionProvider } = fixture.getProviders()
+    const text = [
+      '# syntax=docker/dockerfile:1',
+      'FROM node:24 AS deps',
+      'RUN echo deps',
+      '',
+      '# build stage',
+      '',
+      'FROM deps AS build',
+      'COPY --from=build /app/dist /app'
+    ].join('\n')
+    const column = text.split('\n')[7].indexOf('build') + 1
+    const definition = definitionProvider?.provideDefinition(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fixture implements the model methods read by the definition provider.
+      fakeModel(text) as never,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fixture position only needs lineNumber and column for this provider.
+      { lineNumber: 8, column } as never,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The provider does not read the cancellation token in this test.
+      undefined as never
+    )
+    expect(definition).toMatchObject({
+      range: {
+        startLineNumber: 7,
+        startColumn: 14,
+        endLineNumber: 7,
+        endColumn: 19
+      }
+    })
+  })
+
+  it('keeps the whole FROM line for a numeric reference', () => {
+    const fixture = fakeMonaco()
+    register(fixture)
+    const { definitionProvider } = fixture.getProviders()
+    const text = 'FROM node AS base\nCOPY --from=0 /a /b'
+    const column = text.split('\n')[1].indexOf('0') + 1
+    const definition = definitionProvider?.provideDefinition(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fixture implements the model methods read by the definition provider.
+      fakeModel(text) as never,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fixture position only needs lineNumber and column for this provider.
+      { lineNumber: 2, column } as never,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The provider does not read the cancellation token in this test.
+      undefined as never
+    )
+    expect(definition).toMatchObject({
+      range: {
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: 1,
+        endColumn: 18
+      }
+    })
   })
 })

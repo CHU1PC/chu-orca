@@ -11,7 +11,15 @@ describe('parseDockerfileStages', () => {
       parseDockerfileStages('FROM node\nRUN <<EOF\nFROM text\nEOF\nFROM base AS final')
     ).toEqual([
       { index: 0, fromLine: 1, endLine: 4 },
-      { index: 1, name: 'final', fromLine: 5, endLine: 5 }
+      {
+        index: 1,
+        name: 'final',
+        nameLine: 5,
+        nameStartColumn: 14,
+        nameEndColumn: 19,
+        fromLine: 5,
+        endLine: 5
+      }
     ])
   })
 
@@ -23,13 +31,62 @@ describe('parseDockerfileStages', () => {
 
   it('parses FROM --platform=$BUILDPLATFORM node:24 AS build', () => {
     expect(parseDockerfileStages('FROM --platform=$BUILDPLATFORM node:24 AS build')).toEqual([
-      { index: 0, name: 'build', fromLine: 1, endLine: 1 }
+      {
+        index: 0,
+        name: 'build',
+        nameLine: 1,
+        nameStartColumn: 43,
+        nameEndColumn: 48,
+        fromLine: 1,
+        endLine: 1
+      }
     ])
   })
 
   it('parses lowercase from ... as ...', () => {
     expect(parseDockerfileStages('from alpine as Base')).toEqual([
-      { index: 0, name: 'Base', fromLine: 1, endLine: 1 }
+      {
+        index: 0,
+        name: 'Base',
+        nameLine: 1,
+        nameStartColumn: 16,
+        nameEndColumn: 20,
+        fromLine: 1,
+        endLine: 1
+      }
+    ])
+  })
+
+  it('records the stage name location', () => {
+    const text = [
+      '# syntax=docker/dockerfile:1',
+      'FROM node:24 AS deps',
+      'RUN echo deps',
+      '',
+      '# build stage',
+      '',
+      'FROM deps AS build'
+    ].join('\n')
+    expect(parseDockerfileStages(text)[1]).toMatchObject({
+      name: 'build',
+      nameLine: 7,
+      nameStartColumn: 14,
+      nameEndColumn: 19
+    })
+  })
+
+  it('records the stage name location on a continuation line', () => {
+    const text = ['FROM node:24 \\', '  AS deps'].join('\n')
+    expect(parseDockerfileStages(text)).toEqual([
+      {
+        index: 0,
+        name: 'deps',
+        nameLine: 2,
+        nameStartColumn: 6,
+        nameEndColumn: 10,
+        fromLine: 1,
+        endLine: 2
+      }
     ])
   })
 
@@ -64,7 +121,15 @@ describe('parseDockerfileStages', () => {
 
   it('uses a backtick escape directive', () => {
     expect(parseDockerfileStages('# escape=`\nFROM `\n  node:24 AS build')).toEqual([
-      { index: 0, name: 'build', fromLine: 2, endLine: 3 }
+      {
+        index: 0,
+        name: 'build',
+        nameLine: 3,
+        nameStartColumn: 14,
+        nameEndColumn: 19,
+        fromLine: 2,
+        endLine: 3
+      }
     ])
   })
 
@@ -90,7 +155,15 @@ describe('parseDockerfileStages', () => {
 
   it('skips comment lines inside a continuation', () => {
     expect(parseDockerfileStages('FROM \\\n# comment\n  node AS build')).toEqual([
-      { index: 0, name: 'build', fromLine: 1, endLine: 3 }
+      {
+        index: 0,
+        name: 'build',
+        nameLine: 3,
+        nameStartColumn: 11,
+        nameEndColumn: 16,
+        fromLine: 1,
+        endLine: 3
+      }
     ])
   })
 
