@@ -3,6 +3,7 @@ import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 're
 import Editor from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import type { MarkdownDocument } from '../../../../shared/filesystem-entry-types'
+import './monaco-indent-shading.css'
 import { useAppStore } from '@/store'
 import '@/lib/monaco-setup'
 import { computeEditorFontSize, resolveEditorFontFamily } from '@/lib/editor-font-zoom'
