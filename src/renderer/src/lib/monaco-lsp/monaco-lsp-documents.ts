@@ -1,5 +1,9 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
 import type { IDisposable, editor } from 'monaco-editor'
+import type {
+  LspDocumentLinkCapabilities,
+  LspSemanticTokensLegend
+} from '../../../../shared/lsp-types'
 import { monaco } from '@/lib/monaco-setup'
 import {
   lspMarkerOwner,
@@ -22,6 +26,8 @@ export type LspDocumentEntry = {
   source: 'project' | 'PATH'
   isPrimary: boolean
   pullDiagnostics: boolean
+  semanticTokensLegend?: LspSemanticTokensLegend
+  documentLinks?: LspDocumentLinkCapabilities
   model: editor.ITextModel
   refCount: number
   changeTimer: ReturnType<typeof setTimeout> | null
@@ -131,6 +137,8 @@ export async function openLspDocumentForModel(params: {
       source: 'project' | 'PATH'
       isPrimary: boolean
       pullDiagnostics: boolean
+      semanticTokensLegend?: LspSemanticTokensLegend
+      documentLinks?: LspDocumentLinkCapabilities
     }[]
     fileUri?: string | null
     projectToolsSkippedReason?: string
@@ -179,6 +187,10 @@ export async function openLspDocumentForModel(params: {
       source: session.source,
       isPrimary: session.isPrimary,
       pullDiagnostics: session.pullDiagnostics,
+      ...(session.semanticTokensLegend
+        ? { semanticTokensLegend: session.semanticTokensLegend }
+        : {}),
+      ...(session.documentLinks ? { documentLinks: session.documentLinks } : {}),
       model,
       refCount: 1,
       changeTimer: null,

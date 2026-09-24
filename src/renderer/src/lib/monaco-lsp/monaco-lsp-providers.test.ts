@@ -62,6 +62,7 @@ function fakeMonaco(): {
     MarkerSeverity: { Error: 8, Warning: 4, Info: 2, Hint: 1 },
     Uri: { parse: (value: string) => ({ toString: () => value }) },
     editor: {
+      getEditors: vi.fn(() => []),
       getModelMarkers: vi.fn(() => []),
       onDidChangeMarkers: vi.fn(() => disposable()),
       registerEditorOpener: vi.fn(() => disposable()),

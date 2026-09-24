@@ -80,7 +80,7 @@ monacoTS.javascriptDefaults.setCompilerOptions({
 })
 
 runMonacoSetupSteps([
-  ['LSP configuration', configureMonacoLsp],
+  ['LSP configuration', () => configureMonacoLsp(monaco)],
   ['TextMate configuration', configureMonacoTextMate],
   ['Vue language registration', () => registerVueLanguage(monaco)],
   ['Svelte language registration', () => registerSvelteLanguage(monaco)],

@@ -7,10 +7,22 @@ export const LSP_REQUEST_METHODS = [
   'textDocument/definition',
   'textDocument/references',
   'textDocument/completion',
-  'textDocument/diagnostic'
+  'textDocument/diagnostic',
+  'textDocument/semanticTokens/full',
+  'textDocument/documentLink',
+  'documentLink/resolve'
 ] as const
 
 export type LspRequestMethod = (typeof LSP_REQUEST_METHODS)[number]
+
+export type LspSemanticTokensLegend = {
+  tokenTypes: string[]
+  tokenModifiers: string[]
+}
+
+export type LspDocumentLinkCapabilities = {
+  resolveProvider: boolean
+}
 
 export type LspOpenDocumentArgs = {
   /** Absolute local path of the file being edited. */
@@ -40,6 +52,8 @@ export type LspSessionInfo = {
   isPrimary: boolean
   /** True when the server wants pull diagnostics instead of pushing them. */
   pullDiagnostics: boolean
+  semanticTokensLegend?: LspSemanticTokensLegend
+  documentLinks?: LspDocumentLinkCapabilities
 }
 
 export type LspChangeDocumentArgs = {

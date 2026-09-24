@@ -12,6 +12,7 @@ const WORD_TOKEN_REGEX = /[^\s()[\]{}'",;<>|`]+/g
 const EXTENSIONLESS_FILENAMES = new Set([
   'Makefile',
   'Dockerfile',
+  'Containerfile',
   'Rakefile',
   'Gemfile',
   'Procfile',

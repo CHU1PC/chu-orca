@@ -1,5 +1,6 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
 import type { ChildProcessWithoutNullStreams } from '../../shared/child-process/run-process'
+import type { LspDocumentLinkCapabilities, LspSemanticTokensLegend } from '../../shared/lsp-types'
 
 export type PendingRequest = {
   resolve: (result: unknown) => void
@@ -26,6 +27,8 @@ export type LspSession = {
   // Why: pull-model servers (tsgo, TS7) advertise diagnosticProvider and never
   // push; the renderer must know which model this session speaks.
   pullDiagnostics: boolean
+  semanticTokensLegend?: LspSemanticTokensLegend
+  documentLinks?: LspDocumentLinkCapabilities
   idleTimer: NodeJS.Timeout | null
   terminationTimers: {
     shutdown: NodeJS.Timeout | null

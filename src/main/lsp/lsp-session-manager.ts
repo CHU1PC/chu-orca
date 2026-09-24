@@ -8,6 +8,7 @@ import type {
 import { canonicalFileUriKey } from './lsp-file-uri-key'
 import { buildLspInitializeParams } from './lsp-initialize-params'
 import { encodeLspMessage, LspMessageDecoder } from './lsp-message-framing'
+import { parseLspServerCapabilities } from './lsp-server-capabilities'
 import {
   getProjectToolsSkippedReason,
   resolveLspServersForLanguage,
@@ -146,18 +147,7 @@ export function createLspSessionManager(deps?: {
       'initialize',
       buildLspInitializeParams(rootPath)
     ).then((result) => {
-      const capabilities =
-        result !== null && typeof result === 'object' && 'capabilities' in result
-          ? result.capabilities
-          : undefined
-      const diagnosticProvider =
-        capabilities !== null &&
-        typeof capabilities === 'object' &&
-        capabilities !== undefined &&
-        'diagnosticProvider' in capabilities
-          ? capabilities.diagnosticProvider
-          : undefined
-      session.pullDiagnostics = Boolean(diagnosticProvider)
+      Object.assign(session, parseLspServerCapabilities(result))
       send(session, { jsonrpc: '2.0', method: 'initialized', params: {} })
     })
     session.initialization.catch(() => {})
@@ -241,7 +231,11 @@ export function createLspSessionManager(deps?: {
         resolvedCommand: session.resolvedCommand,
         source: session.source,
         isPrimary: descriptor.role !== 'diagnostics-only',
-        pullDiagnostics: session.pullDiagnostics
+        pullDiagnostics: session.pullDiagnostics,
+        ...(session.semanticTokensLegend
+          ? { semanticTokensLegend: session.semanticTokensLegend }
+          : {}),
+        ...(session.documentLinks ? { documentLinks: session.documentLinks } : {})
       })
     }
     return sessions.length > 0

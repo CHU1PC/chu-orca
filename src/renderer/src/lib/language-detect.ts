@@ -77,6 +77,7 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   '.graphql': 'graphql',
   '.gql': 'graphql',
   '.dockerfile': 'dockerfile',
+  '.containerfile': 'dockerfile',
   '.proto': 'proto',
   '.lua': 'lua',
   '.r': 'r',
@@ -107,6 +108,7 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
 
 const FILENAME_TO_LANGUAGE: Record<string, string> = {
   Dockerfile: 'dockerfile',
+  Containerfile: 'dockerfile',
   Makefile: 'makefile',
   'CMakeLists.txt': 'cmake',
   '.gitignore': 'ini',
@@ -124,6 +126,15 @@ export function detectLanguage(filePath: string): string {
   const filename = parts.at(-1)!
   if (FILENAME_TO_LANGUAGE[filename]) {
     return FILENAME_TO_LANGUAGE[filename]
+  }
+  const lowerFilename = filename.toLowerCase()
+  if (
+    lowerFilename === 'dockerfile' ||
+    lowerFilename === 'containerfile' ||
+    lowerFilename.startsWith('dockerfile.') ||
+    lowerFilename.startsWith('containerfile.')
+  ) {
+    return 'dockerfile'
   }
 
   // Check extension

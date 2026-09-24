@@ -46,6 +46,7 @@ to the workspace root and uses the first matching executable.
 
 - Python searches each `.venv/bin/<command>`, then `PATH`.
 - TypeScript and JavaScript search each `node_modules/.bin/<command>`, then `PATH`.
+- Dockerfile searches each `node_modules/.bin/docker-langserver`, then `PATH`.
 - Go and Rust search `PATH`.
 - Pyright receives the same `.venv/bin/python` selected for Python servers.
 - Python starts Pyright as the primary server and every available Ruff server

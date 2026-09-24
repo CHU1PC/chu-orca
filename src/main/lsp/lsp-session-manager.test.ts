@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url'
 import type { ChildProcessWithoutNullStreams } from '../../shared/child-process/run-process'
 import { describe, expect, it, vi } from 'vitest'
 import { encodeLspMessage, LspMessageDecoder } from './lsp-message-framing'
+import { LSP_REQUEST_METHODS } from '../../shared/lsp-types'
 import type { LspServerDescriptor } from './lsp-server-catalog'
 import {
   createLspSessionManager,
@@ -160,6 +161,56 @@ describe('createLspSessionManager', () => {
     expect(opened.sessions[0]?.pullDiagnostics).toBe(true)
   })
 
+  it('returns advertised semantic tokens and document link capabilities', async () => {
+    const { manager } = createManagerWithFakeServer({
+      semanticTokensProvider: {
+        full: true,
+        legend: {
+          tokenTypes: [
+            'keyword',
+            'comment',
+            'parameter',
+            'property',
+            'namespace',
+            'class',
+            'macro',
+            'string',
+            'variable',
+            'operator'
+          ],
+          tokenModifiers: ['declaration', 'definition', 'deprecated']
+        }
+      },
+      documentLinkProvider: { resolveProvider: true }
+    })
+    const opened = await manager.openDocument(openArgs)
+    expect(opened.sessions[0]).toMatchObject({
+      semanticTokensLegend: {
+        tokenTypes: [
+          'keyword',
+          'comment',
+          'parameter',
+          'property',
+          'namespace',
+          'class',
+          'macro',
+          'string',
+          'variable',
+          'operator'
+        ],
+        tokenModifiers: ['declaration', 'definition', 'deprecated']
+      },
+      documentLinks: { resolveProvider: true }
+    })
+  })
+
+  it('omits unsupported semantic tokens and document links from session info', async () => {
+    const { manager } = createManagerWithFakeServer()
+    const opened = await manager.openDocument(openArgs)
+    expect(opened.sessions[0]).not.toHaveProperty('semanticTokensLegend')
+    expect(opened.sessions[0]).not.toHaveProperty('documentLinks')
+  })
+
   it('answers workspace/configuration with one null per requested item', async () => {
     const { fake, manager } = createManagerWithFakeServer()
     await manager.openDocument(openArgs)
@@ -238,6 +289,31 @@ describe('createLspSessionManager', () => {
     const hoverRequest = await fake.waitFor((m) => m.method === 'textDocument/hover')
     fake.reply(hoverRequest.id!, { contents: 'docs' })
     await expect(pending).resolves.toEqual({ contents: 'docs' })
+  })
+
+  it('routes semantic token and document link methods through the request path', async () => {
+    const { fake, manager } = createManagerWithFakeServer()
+    const opened = await manager.openDocument(openArgs)
+    const methods = [
+      'textDocument/semanticTokens/full',
+      'textDocument/documentLink',
+      'documentLink/resolve'
+    ] as const
+    expect(LSP_REQUEST_METHODS).toEqual(expect.arrayContaining([...methods]))
+    for (const method of methods) {
+      const params =
+        method === 'documentLink/resolve'
+          ? {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+              target: 'file:///workspace/x'
+            }
+          : { textDocument: { uri: opened.fileUri } }
+      const pending = manager.request(opened.sessions[0]!.sessionId, method, params)
+      const request = await fake.waitFor((message) => message.method === method)
+      expect(request.params).toEqual(params)
+      fake.reply(request.id!, { method })
+      await expect(pending).resolves.toEqual({ method })
+    }
   })
 
   it('forwards publishDiagnostics for open documents only', async () => {

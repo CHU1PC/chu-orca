@@ -56,7 +56,12 @@ const OPEN_RESULT = {
       resolvedCommand: '/bin/tsgo',
       source: 'PATH',
       isPrimary: true,
-      pullDiagnostics: false
+      pullDiagnostics: false,
+      semanticTokensLegend: {
+        tokenTypes: ['keyword', 'comment'],
+        tokenModifiers: ['declaration']
+      },
+      documentLinks: { resolveProvider: true }
     },
     {
       sessionId: 'lsp-2',
@@ -115,6 +120,21 @@ describe('openLspDocumentForModel', () => {
     expect(remaining[0].model).toBe(diffModel)
     closeLspDocumentForModel(diffModel.uri.toString(), () => {})
     expect(getLspEntriesForSessionDocument('lsp-1', OPEN_RESULT.fileUri)).toHaveLength(0)
+  })
+
+  it('carries semantic token and document link capabilities onto opened entries', async () => {
+    stubLspApi()
+    const model = fakeModel('file:///w/src/a.ts', 'x')
+    const entry = await openLspDocumentForModel({ ...openParams, model })
+
+    expect(entry).toMatchObject({
+      semanticTokensLegend: {
+        tokenTypes: ['keyword', 'comment'],
+        tokenModifiers: ['declaration']
+      },
+      documentLinks: { resolveProvider: true }
+    })
+    closeLspDocumentForModel(model.uri.toString(), () => {})
   })
 
   it('re-syncs text that changed while the open round-trip was in flight', async () => {

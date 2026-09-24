@@ -1,5 +1,6 @@
 import type * as Monaco from 'monaco-editor'
 import oneDarkProTheme from './themes/one-dark-pro.json'
+import { semanticStyleThemeRules } from './semantic-token-style'
 
 type VsCodeTokenColorSettings = {
   foreground?: string
@@ -16,6 +17,8 @@ export type MonacoTokenColorRule = {
   foreground?: string
   fontStyle?: string
 }
+
+type MonacoThemeApi = Pick<typeof Monaco.editor, 'defineTheme'>
 
 function expandScopes(scope: VsCodeTokenColor['scope']): string[] {
   if (Array.isArray(scope)) {
@@ -68,8 +71,11 @@ export function convertVsCodeTokenColors(
   return rules
 }
 
-export function defineOneDarkTheme(monaco: typeof Monaco): void {
-  const rules = convertVsCodeTokenColors(oneDarkProTheme.tokenColors)
+export function defineOneDarkTheme(monaco: { editor: MonacoThemeApi }): void {
+  const rules = [
+    ...convertVsCodeTokenColors(oneDarkProTheme.tokenColors),
+    ...semanticStyleThemeRules()
+  ]
   // テーマの色マップはコピーせず、トークン色だけを変更してエディター背景とクロームをOrca側に任せる。
   monaco.editor.defineTheme('vs-dark', {
     base: 'vs-dark',
