@@ -258,6 +258,7 @@ export default function MonacoEditor({
           fontSize: editorFontSize,
           fontFamily: editorFontFamily,
           lineNumbers: 'on',
+          'semanticHighlighting.enabled': true,
           renderLineHighlight: 'line',
           automaticLayout: true,
           tabSize: 2,

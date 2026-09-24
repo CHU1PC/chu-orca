@@ -1,6 +1,6 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
 import type * as MonacoNamespace from 'monaco-editor'
-import type { IDisposable, IPosition, IRange, editor, languages } from 'monaco-editor'
+import type { IPosition, IRange, editor, languages } from 'monaco-editor'
 import { relativePathInsideRoot } from '../../../../shared/cross-platform-path'
 import { detectLanguage } from '@/lib/language-detect'
 import { useAppStore } from '@/store'
@@ -19,6 +19,8 @@ import {
   getLspEntryForModelUri
 } from './monaco-lsp-documents'
 import type { LspDocumentEntry } from './monaco-lsp-documents'
+import { ensureCapabilityLspProviders } from './monaco-lsp-capability-providers'
+import { createMonacoProviderRegistry } from './monaco-provider-registrations'
 import {
   createInlineDiagnosticsWiring,
   type InlineDiagnosticsWiring
@@ -26,8 +28,7 @@ import {
 
 type MonacoApi = typeof MonacoNamespace
 
-let providerMonaco: MonacoApi | null = null
-let disposables: IDisposable[] = []
+const providerRegistry = createMonacoProviderRegistry<MonacoApi>()
 let unsubscribeDiagnostics: (() => void) | null = null
 let inlineDiagnosticsWiring: InlineDiagnosticsWiring | null = null
 const registeredLanguages = new Set<string>()
@@ -127,8 +128,8 @@ function openDefinitionTarget(
 
 function ensureGlobalLspWiring(monaco: MonacoApi): void {
   inlineDiagnosticsWiring = createInlineDiagnosticsWiring(monaco)
-  disposables.push(inlineDiagnosticsWiring)
-  disposables.push(
+  providerRegistry.push(inlineDiagnosticsWiring)
+  providerRegistry.push(
     monaco.editor.registerEditorOpener({
       openCodeEditor: (source, resource, selectionOrPosition) =>
         selectionOrPosition ? openDefinitionTarget(source, resource, selectionOrPosition) : false
@@ -161,26 +162,32 @@ function ensureGlobalLspWiring(monaco: MonacoApi): void {
 
 /** Register LSP-backed language features once per language id. Called only
  *  after a document successfully opened, so unsupported setups register nothing. */
-export function ensureLspSupportForLanguage(monaco: MonacoApi, languageId: string): void {
-  if (providerMonaco !== monaco) {
-    // Why: a re-created Monaco (window reload) makes old registrations stale.
-    for (const disposable of disposables) {
-      disposable.dispose()
-    }
-    disposables = []
+export function ensureLspSupportForLanguage(
+  monaco: MonacoApi,
+  languageId: string,
+  entries: readonly LspDocumentEntry[] = []
+): void {
+  providerRegistry.resetIfMonacoChanged(monaco, () => {
     registeredLanguages.clear()
     inlineDiagnosticsWiring = null
     unsubscribeDiagnostics?.()
     unsubscribeDiagnostics = null
-    providerMonaco = monaco
     ensureGlobalLspWiring(monaco)
+  })
+  for (const editorInstance of monaco.editor.getEditors()) {
+    if (entries.some((entry) => entry.model === editorInstance.getModel())) {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Standalone Monaco returns its own editors here, but the public signature erases the global update option accepted by each one.
+      const standaloneEditor = editorInstance as editor.IStandaloneCodeEditor
+      standaloneEditor.updateOptions({ 'semanticHighlighting.enabled': true })
+    }
   }
+  ensureCapabilityLspProviders(monaco, languageId, entries)
   if (registeredLanguages.has(languageId)) {
     return
   }
   registeredLanguages.add(languageId)
 
-  disposables.push(
+  providerRegistry.push(
     monaco.languages.registerHoverProvider(languageId, {
       provideHover: async (model, position) => {
         const response = await requestForModel(model, position, 'textDocument/hover')
@@ -246,7 +253,7 @@ export function ensureInlineDiagnosticsForModel(
   editorInstance: editor.ICodeEditor,
   model: editor.ITextModel
 ): () => void {
-  if (providerMonaco !== monaco || !inlineDiagnosticsWiring) {
+  if (!providerRegistry.isFor(monaco) || !inlineDiagnosticsWiring) {
     return () => {}
   }
   return inlineDiagnosticsWiring.trackModel(editorInstance, model)

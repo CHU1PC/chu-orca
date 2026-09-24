@@ -2,9 +2,7 @@
 import { basename } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-/** Client capabilities for Orca's LSP bridge: hover, definition, completion,
- *  push + pull diagnostics, full-text sync. Advertising `diagnostic` lets
- *  pull-model servers (tsgo/TS7) expose their diagnosticProvider. */
+/** Client capabilities for Orca's LSP bridge, including semantic tokens and document links. */
 export function buildLspInitializeParams(rootPath: string): object {
   const rootUri = pathToFileURL(rootPath).toString()
   return {
@@ -19,6 +17,50 @@ export function buildLspInitializeParams(rootPath: string): object {
         completion: {
           completionItem: { snippetSupport: false, documentationFormat: ['markdown', 'plaintext'] }
         },
+        semanticTokens: {
+          requests: { full: true, range: false },
+          tokenTypes: [
+            'namespace',
+            'type',
+            'class',
+            'enum',
+            'interface',
+            'struct',
+            'typeParameter',
+            'parameter',
+            'variable',
+            'property',
+            'enumMember',
+            'event',
+            'function',
+            'method',
+            'macro',
+            'keyword',
+            'modifier',
+            'comment',
+            'string',
+            'number',
+            'regexp',
+            'operator',
+            'decorator'
+          ],
+          tokenModifiers: [
+            'declaration',
+            'definition',
+            'readonly',
+            'static',
+            'deprecated',
+            'abstract',
+            'async',
+            'modification',
+            'documentation',
+            'defaultLibrary'
+          ],
+          formats: ['relative'],
+          overlappingTokenSupport: false,
+          multilineTokenSupport: false
+        },
+        documentLink: { tooltipSupport: true },
         publishDiagnostics: {},
         diagnostic: {},
         synchronization: { didSave: false }

@@ -79,6 +79,8 @@ export function DiffSectionBody({
 }: DiffSectionBodyProps): React.JSX.Element {
   const renderLimit = section.largeDiffRenderLimit?.limited ? section.largeDiffRenderLimit : null
   const handleEditorMount: DiffOnMount = (editor, monaco) => {
+    editor.getOriginalEditor().updateOptions({ 'semanticHighlighting.enabled': true })
+    editor.getModifiedEditor().updateOptions({ 'semanticHighlighting.enabled': true })
     const cleanupShiftWheelScroll = installDiffEditorShiftWheelScroll(editor)
     editor.onDidDispose(cleanupShiftWheelScroll)
     onMount(editor, monaco)

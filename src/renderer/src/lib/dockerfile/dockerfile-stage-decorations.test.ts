@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   attachDockerfileStageDecorations,
-  buildDockerfileStageDecorations
+  buildDockerfileStageDecorations,
+  ensureDockerfileStageSeparatorStyles
 } from './dockerfile-stage-decorations'
 
 type Listener = () => void
@@ -62,7 +63,21 @@ describe('dockerfile stage decorations', () => {
     vi.useFakeTimers()
   })
 
-  afterEach(() => vi.useRealTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('uses the input token for the stage separator border', () => {
+    const style = { id: '', textContent: '' }
+    vi.stubGlobal('document', {
+      getElementById: vi.fn(() => null),
+      createElement: vi.fn(() => style),
+      head: { appendChild: vi.fn() }
+    })
+    ensureDockerfileStageSeparatorStyles()
+    expect(style.textContent).toContain('border-top: 1px solid var(--input)')
+  })
 
   it('adds separators for stages 2 through n only', () => {
     expect(

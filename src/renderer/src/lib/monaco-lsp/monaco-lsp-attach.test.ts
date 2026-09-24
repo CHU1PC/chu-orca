@@ -15,7 +15,8 @@ vi.mock('@/lib/monaco-setup', () => ({
 
 vi.mock('./monaco-lsp-documents', () => ({
   openLspDocumentForModel: mocks.open,
-  closeLspDocumentForModel: mocks.close
+  closeLspDocumentForModel: mocks.close,
+  getLspEntriesForModelUri: vi.fn(() => [])
 }))
 
 vi.mock('./monaco-lsp-providers', () => ({
@@ -35,7 +36,7 @@ function fixture(): {
     uri: { toString: () => 'file:///workspace/a.ts' },
     isDisposed: () => false
   }
-  const mountedEditor = { getModel: () => model }
+  const mountedEditor = { getModel: () => model, updateOptions: vi.fn() }
   return {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The fixture implements every member read by attachMonacoLspDocument and its mocked collaborators.
     model: model as unknown as editor.ITextModel,
@@ -66,7 +67,7 @@ describe('attachMonacoLspDocument', () => {
     const detach = attachMonacoLspDocument(params)
 
     await vi.waitFor(() =>
-      expect(mocks.ensureSupport).toHaveBeenCalledWith(expect.anything(), 'typescript')
+      expect(mocks.ensureSupport).toHaveBeenCalledWith(expect.anything(), 'typescript', [])
     )
     expect(mocks.open).toHaveBeenCalledWith({
       model: params.model,

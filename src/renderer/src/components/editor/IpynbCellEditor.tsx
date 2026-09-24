@@ -147,6 +147,7 @@ function IpynbCodeCellEditor({
         onChange={(value) => onChange(value ?? '')}
         options={{
           automaticLayout: true,
+          'semanticHighlighting.enabled': true,
           fontFamily: resolveEditorFontFamily(settings),
           fontSize,
           glyphMargin: false,

@@ -1,7 +1,11 @@
 // Origin: upstream PR #14873 by moishinetzer, MIT-licensed.
 import type { editor } from 'monaco-editor'
 import { monaco } from '@/lib/monaco-setup'
-import { closeLspDocumentForModel, openLspDocumentForModel } from './monaco-lsp-documents'
+import {
+  closeLspDocumentForModel,
+  getLspEntriesForModelUri,
+  openLspDocumentForModel
+} from './monaco-lsp-documents'
 import {
   clearLspMarkers,
   ensureInlineDiagnosticsForModel,
@@ -41,7 +45,7 @@ export function attachMonacoLspDocument(params: {
       return
     }
     opened = true
-    ensureLspSupportForLanguage(monaco, params.languageId)
+    ensureLspSupportForLanguage(monaco, params.languageId, getLspEntriesForModelUri(modelUri))
     detachInlineDiagnostics = ensureInlineDiagnosticsForModel(monaco, params.editor, params.model)
   })
   return () => {

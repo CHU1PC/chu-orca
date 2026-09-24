@@ -38,7 +38,7 @@ export function ensureDockerfileStageSeparatorStyles(): void {
   }
   const style = document.createElement('style')
   style.id = DOCKERFILE_STAGE_SEPARATOR_STYLES_ID
-  style.textContent = `.monaco-editor .${DOCKERFILE_STAGE_SEPARATOR_CLASS} { border-top: 1px solid var(--border); }`
+  style.textContent = `.monaco-editor .${DOCKERFILE_STAGE_SEPARATOR_CLASS} { border-top: 1px solid var(--input); }`
   document.head.appendChild(style)
 }
 
