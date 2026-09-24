@@ -7,6 +7,7 @@ import {
 } from './monaco-markdown-doc-completions'
 import type { MarkdownDocLinkDecorationController } from './monaco-markdown-doc-link-decorations'
 import { buildGitConflictDecorations } from './monaco-conflict-decorations'
+import { createMonacoIndentShadingController } from './monaco-indent-shading-decorations'
 
 export type MonacoEditorDecorations = {
   markdownDocLinkDecorationsRef: MutableRefObject<MarkdownDocLinkDecorationController | null>
@@ -84,6 +85,14 @@ export function useMonacoEditorDecorations(params: {
     }
     conflictDecorationsRef.current.set(decorations)
   }, [conflictDecorationsEnabled, content, mountedEditor])
+
+  useEffect(() => {
+    if (!mountedEditor) {
+      return
+    }
+    const indentShading = createMonacoIndentShadingController(mountedEditor)
+    return () => indentShading.dispose()
+  }, [mountedEditor])
 
   useEffect(() => {
     updateMarkdownCompletionDocuments()
