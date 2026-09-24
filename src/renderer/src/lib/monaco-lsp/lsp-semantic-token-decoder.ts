@@ -61,8 +61,7 @@ export function decodeLspSemanticTokens(
     if (
       length === 0 ||
       typeIndex >= serverLegend.tokenTypes.length ||
-      modifierBits > modifierMask ||
-      tokenType === undefined
+      modifierBits > modifierMask
     ) {
       continue
     }
