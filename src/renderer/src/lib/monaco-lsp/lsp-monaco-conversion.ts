@@ -137,7 +137,7 @@ const LSP_COMPLETION_KIND_NAMES: readonly string[] = [
   'TypeParameter'
 ]
 
-export type MonacoSuggestionShape = {
+export type MonacoCompletionSuggestion = {
   label: string
   kind: number
   detail?: string
@@ -153,17 +153,17 @@ export function lspCompletionToMonaco(
   result: unknown,
   defaultRange: IRange,
   enums: { kinds: Record<string, number>; snippetRule: number }
-): { suggestions: MonacoSuggestionShape[]; incomplete: boolean } {
+): { suggestions: MonacoCompletionSuggestion[]; incomplete: boolean } {
   const items = Array.isArray(result)
     ? result.filter(isLspCompletionItem)
     : isRecord(result) && Array.isArray(result.items)
       ? result.items.filter(isLspCompletionItem)
       : []
   const incomplete = isRecord(result) && result.isIncomplete === true
-  const suggestions = items.map((item): MonacoSuggestionShape => {
+  const suggestions = items.map((item): MonacoCompletionSuggestion => {
     const editRange = item.textEdit?.range ?? item.textEdit?.insert
     const kindName = LSP_COMPLETION_KIND_NAMES[(item.kind ?? 1) - 1] ?? 'Text'
-    const suggestion: MonacoSuggestionShape = {
+    const suggestion: MonacoCompletionSuggestion = {
       label: item.label,
       kind: enums.kinds[kindName] ?? enums.kinds.Text,
       insertText: item.textEdit?.newText ?? item.insertText ?? item.label,
@@ -189,7 +189,7 @@ export function lspCompletionToMonaco(
   return { suggestions, incomplete }
 }
 
-export type MonacoMarkerShape = IRange & {
+export type MonacoDiagnosticMarker = IRange & {
   severity: number
   message: string
   code?: string
@@ -200,14 +200,14 @@ export function lspDiagnosticsToMonacoMarkers(
   diagnostics: unknown[],
   severities: { Error: number; Warning: number; Info: number; Hint: number },
   serverId?: string
-): MonacoMarkerShape[] {
+): MonacoDiagnosticMarker[] {
   const severityByLspCode = [severities.Error, severities.Warning, severities.Info, severities.Hint]
   return diagnostics.filter(isLspDiagnostic).map((diagnostic) => {
     const code =
       typeof diagnostic.code === 'object' && diagnostic.code !== null
         ? diagnostic.code.value
         : diagnostic.code
-    const marker: MonacoMarkerShape = {
+    const marker: MonacoDiagnosticMarker = {
       ...lspRangeToMonaco(diagnostic.range),
       severity: severityByLspCode[(diagnostic.severity ?? 1) - 1] ?? severities.Error,
       message: diagnostic.message
