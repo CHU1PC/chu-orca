@@ -63,8 +63,6 @@ const diagnosticsOptions = {
 }
 monacoTS.typescriptDefaults.setDiagnosticsOptions(diagnosticsOptions)
 monacoTS.javascriptDefaults.setDiagnosticsOptions(diagnosticsOptions)
-configureMonacoLsp()
-configureMonacoTextMate()
 
 // Why: .tsx/.jsx files share the base 'typescript'/'javascript' language ids
 // in Monaco's registry (there is no separate 'typescriptreact' id), so the
@@ -82,6 +80,8 @@ monacoTS.javascriptDefaults.setCompilerOptions({
 })
 
 runMonacoSetupSteps([
+  ['LSP configuration', configureMonacoLsp],
+  ['TextMate configuration', configureMonacoTextMate],
   ['Vue language registration', () => registerVueLanguage(monaco)],
   ['Svelte language registration', () => registerSvelteLanguage(monaco)],
   ['Astro language registration', () => registerAstroLanguage(monaco)],
