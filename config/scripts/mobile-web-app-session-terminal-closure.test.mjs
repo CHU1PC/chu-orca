@@ -364,8 +364,15 @@ const MERMAID_PACKAGE = 'node_modules/mermaid/'
  *
  *   modules        4210 -> 4211   (+1)
  *   local modules  1024 -> 1025   (+1)
+ *
+ * Reverting #18790 then took `src/shared/agent-icons/freebuff.png` back out of
+ * `mobile-agent-icon-assets.ts`, undoing the one module #22119 pinned for it. Measured on the
+ * revert against this branch's 4,207.
+ *
+ *   modules        4207 -> 4206   (-1)
+ *   local modules  1021 -> 1020   (-1)
  */
-const SESSION_ROUTE_MODULES = 4207
+const SESSION_ROUTE_MODULES = 4206
 
 /** What the page enters this route through once the route is a switch with a `.web.tsx` sibling. */
 const ROUTE_ENTRY = [
