@@ -5,39 +5,13 @@ export const MONACO_INDENT_SHADING_REFRESH_DELAY_MS = 150
 
 type MonacoIndentShadingEvent = (listener: () => void) => IDisposable
 
-type MonacoIndentShadingModel = Omit<
-  Pick<
-    editor.ITextModel,
-    'getLineCount' | 'getLineContent' | 'getOptions' | 'onDidChangeContent' | 'onDidChangeOptions'
-  >,
-  'getOptions' | 'onDidChangeContent' | 'onDidChangeOptions'
-> & {
+type MonacoIndentShadingModel = Pick<editor.ITextModel, 'getLineCount' | 'getLineContent'> & {
   getOptions: () => Pick<ReturnType<editor.ITextModel['getOptions']>, 'tabSize'>
   onDidChangeContent: MonacoIndentShadingEvent
   onDidChangeOptions: MonacoIndentShadingEvent
 }
 
-type MonacoIndentShadingEditor = Omit<
-  Pick<
-    editor.IStandaloneCodeEditor,
-    | 'createDecorationsCollection'
-    | 'getModel'
-    | 'getVisibleRanges'
-    | 'onDidChangeModel'
-    | 'onDidChangeHiddenAreas'
-    | 'onDidLayoutChange'
-    | 'onDidScrollChange'
-    | 'onDidDispose'
-  >,
-  | 'createDecorationsCollection'
-  | 'getModel'
-  | 'getVisibleRanges'
-  | 'onDidChangeModel'
-  | 'onDidChangeHiddenAreas'
-  | 'onDidLayoutChange'
-  | 'onDidScrollChange'
-  | 'onDidDispose'
-> & {
+type MonacoIndentShadingEditor = {
   createDecorationsCollection: () => Pick<editor.IEditorDecorationsCollection, 'set' | 'clear'>
   getModel: () => MonacoIndentShadingModel | null
   getVisibleRanges: () => readonly Pick<

@@ -1,7 +1,7 @@
 .monaco-editor .orca-indent-shading-even {
-  background-color: color-mix(in srgb, var(--muted-foreground) 7%, transparent);
+  background-color: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
 }
 
 .monaco-editor .orca-indent-shading-odd {
-  background-color: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
+  background-color: color-mix(in srgb, var(--muted-foreground) 20%, transparent);
 }
